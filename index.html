@@ -6,6 +6,7 @@
 <title>Wayz Logistics — TMS</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@0.383.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   html,body{height:100%;margin:0}
   .tabular{font-variant-numeric:tabular-nums}
@@ -194,7 +195,7 @@ body{color:var(--text)!important;font-family:var(--font-ui)!important;
           <i data-lucide="bell" class="h-[18px] w-[18px]"></i>
           <span class="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2" style="--tw-ring-color:var(--surface)"></span>
         </button>
-        <button onclick="setActive('emailintake')" class="wz-btn-brand ml-1 flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold">
+        <button onclick="openCreateLoad()" class="wz-btn-brand ml-1 flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold">
           <i data-lucide="plus" class="h-4 w-4"></i> New load
         </button>
       </div>
@@ -208,6 +209,7 @@ body{color:var(--text)!important;font-family:var(--font-ui)!important;
 <!-- Customer portal (external view) -->
 <div id="customerapp" class="hidden"></div>
 <div id="driverview" class="hidden"></div>
+<div id="wzmodal" class="hidden"></div>
 
 <script>
 /* ---------------- DATA ---------------- */
@@ -700,7 +702,7 @@ function mPlanner(){
 
 function mDrivers(){
   const tone={"En route":"bg-indigo-50 text-indigo-700 ring-indigo-200",Loading:"bg-amber-50 text-amber-700 ring-amber-200",Available:"bg-emerald-50 text-emerald-700 ring-emerald-200","Off duty":"bg-slate-100 text-slate-500 ring-slate-200"};
-  return `<div class="p-6"><div class="overflow-hidden rounded-xl border border-slate-200 bg-white"><table class="w-full text-sm"><thead>
+  return `<div class="p-6"><div class="mb-4 flex items-center justify-between"><div class="text-sm text-slate-500">${DRIVERS.length} drivers</div><button onclick="openAddDriver()" class="wz-btn-brand flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"><i data-lucide="plus" class="h-4 w-4"></i> Add driver</button></div><div class="overflow-hidden rounded-xl border border-slate-200 bg-white"><table class="w-full text-sm"><thead>
     <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-4 py-3">Driver</th><th class="px-4 py-3">Truck</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Active loads</th><th class="px-4 py-3">Phone</th></tr>
     </thead><tbody class="divide-y divide-slate-100">${DRIVERS.map(d=>`<tr class="hover:bg-slate-50">
       <td class="px-4 py-3"><div class="flex items-center gap-3"><div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-white">${initials(d.name)}</div><span class="font-medium text-slate-900">${d.name}</span></div></td>
@@ -2185,7 +2187,7 @@ function settingsNotifications(){const s=setStore().notify;const row=(k,l,d)=>`<
 
 function settingsAppearance(){let cur="light";try{cur=document.documentElement.getAttribute("data-theme")||"light";}catch(e){}const card=(m,l,d)=>`<button onclick="setTheme('${m}')" class="flex-1 rounded-xl border p-4 text-left transition ${cur===m?'border-sky-400 ring-2 ring-sky-500/20':'border-slate-200 hover:border-slate-300'}"><div class="text-sm font-semibold text-slate-800">${l}</div><div class="mt-0.5 text-xs text-slate-500">${d}</div></button>`;return panel("Appearance",`<div class="p-4"><div class="mb-2 text-xs font-medium text-slate-500">Theme</div><div class="flex gap-3">${card("light","Daylight","Bright, high-contrast")}${card("dark","Command (dark)","Low-light ops center")}</div></div>`);}
 
-function settingsData(){const link=(t,d,fn,btn)=>`<div class="flex items-center justify-between rounded-lg border border-slate-200 p-3"><div><div class="text-sm font-medium text-slate-800">${t}</div><div class="text-xs text-slate-500">${d}</div></div><button onclick="${fn}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">${btn}</button></div>`;return panel("Data & API",`<div class="space-y-3 p-4">${link("API keys & webhooks","Manage keys for partners and customers","setActive('publicapi')","Open")}${link("Linxup GPS & HOS","Connect your tracking / ELD proxy","setActive('integrations')","Open")}${link("Export data","Download loads, invoices and settlements as CSV","","Export CSV")}</div>`);}
+function settingsData(){const link=(t,d,fn,btn)=>`<div class="flex items-center justify-between rounded-lg border border-slate-200 p-3"><div><div class="text-sm font-medium text-slate-800">${t}</div><div class="text-xs text-slate-500">${d}</div></div><button onclick="${fn}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">${btn}</button></div>`;return WZDB_CARD()+panel("Data & API",`<div class="space-y-3 p-4">${link("API keys & webhooks","Manage keys for partners and customers","setActive('publicapi')","Open")}${link("Linxup GPS & HOS","Connect your tracking / ELD proxy","setActive('integrations')","Open")}${link("Export data","Download loads, invoices and settlements as CSV","","Export CSV")}</div>`);}
 
 function mSettings(){setStore();const t=state.setTab||"company";
   const menu=[["company","Company Profile","building-2"],["terminals","Terminals & Ports","anchor"],["pools","Chassis Pools","link"],["rates","Rates & Accessorials","sliders-horizontal"],["invoicing","Invoicing","file-text"],["notifications","Notifications","bell"],["appearance","Appearance","monitor"],["data","Data & API","database"]];
@@ -2450,7 +2452,93 @@ function render(){
   drawIcons();
   startTickers();
 }
+
+/* ================= LIVE DATA LAYER (Supabase) + CREATE FORMS ================= */
+const WZ={sb:null,connected:false,url:"",key:""};
+const wzInputCls="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white";
+function val(id){const e=document.getElementById(id);return e?String(e.value||"").trim():"";}
+function wzInput(id,label,ph,type){return `<div><label class="mb-1 block text-xs font-medium text-slate-500">${label}</label><input id="${id}" type="${type||'text'}" placeholder="${ph||''}" class="${wzInputCls}"/></div>`;}
+function wzSelect(id,label,opts){return `<div><label class="mb-1 block text-xs font-medium text-slate-500">${label}</label><select id="${id}" class="${wzInputCls}">${opts.map(o=>`<option value="${o}">${o}</option>`).join("")}</select></div>`;}
+function wzModal(inner){const el=document.getElementById("wzmodal");el.className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4";el.innerHTML=`<div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">${inner}</div>`;drawIcons();}
+function wzClose(){const el=document.getElementById("wzmodal");el.className="hidden";el.innerHTML="";}
+window.wzClose=wzClose;
+
+function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||null,consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
+async function wzLoad(){
+  if(!WZ.sb)return;
+  try{const d=await WZ.sb.from("drivers").select("*");if(d.data&&d.data.length){DRIVERS.length=0;d.data.forEach(r=>DRIVERS.push({name:r.name,truck:r.truck||"—",status:r.status||"Available",loads:0,phone:r.phone||"—",hos:(r.hos==null?11:r.hos),chassis:r.chassis||"",kind:r.kind||"company",_id:r.id}));}}catch(e){}
+  try{const l=await WZ.sb.from("loads").select("*");if(l.data&&l.data.length){LOADS.length=0;l.data.forEach(r=>LOADS.push(wzMapLoad(r)));}}catch(e){}
+}
+async function wzConnect(url,key,silent){
+  try{
+    if(!window.supabase){toast("Supabase library still loading — try again in a second");return;}
+    WZ.url=(url||"").trim();WZ.key=(key||"").trim();
+    if(!WZ.url||!WZ.key){toast("Enter both the URL and anon key");return;}
+    WZ.sb=window.supabase.createClient(WZ.url,WZ.key);
+    try{localStorage.setItem("wz_sb_url",WZ.url);localStorage.setItem("wz_sb_key",WZ.key);}catch(_){}
+    WZ.connected=true;
+    await wzLoad();
+    if(!silent)toast("Database connected");
+    render();
+  }catch(e){WZ.connected=false;if(!silent)toast("Connect failed: "+e.message);}
+}
+window.wzConnect=wzConnect;
+function wzInit(){
+  let url="",key="";try{url=localStorage.getItem("wz_sb_url")||"";key=localStorage.getItem("wz_sb_key")||"";}catch(_){}
+  if(url&&key){const go=()=>wzConnect(url,key,true);if(window.supabase)go();else{let n=0;const t=setInterval(()=>{if(window.supabase||n++>60){clearInterval(t);if(window.supabase)go();}},100);}}
+}
+function WZDB_CARD(){const on=WZ.connected;return `<div class="wz-card mb-4"><div class="wz-card-head flex items-center justify-between"><span>Database (Supabase)</span>${on?'<span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Connected</span>':'<span class="text-xs font-medium text-amber-600">Not connected</span>'}</div><div class="p-4"><p class="mb-3 text-sm text-slate-500">Connect your Supabase project so new loads, drivers and invoices save and sync. Find these in Supabase → Project Settings → API. The anon key is safe to use here.</p><div class="space-y-2"><input id="wz_url" value="${WZ.url||''}" placeholder="https://xxxx.supabase.co" class="${wzInputCls}"/><input id="wz_key" value="${WZ.key||''}" placeholder="anon public key" class="${wzInputCls}"/></div><div class="mt-3"><button onclick="wzConnect(document.getElementById('wz_url').value,document.getElementById('wz_key').value)" class="wz-btn-brand rounded-lg px-3.5 py-2 text-sm font-semibold">Connect</button></div></div></div>`;}
+
+/* ---- Add driver ---- */
+function openAddDriver(){wzModal(`
+  <div class="border-b border-slate-100 px-5 py-4"><div class="text-base font-semibold text-slate-900">Add driver</div></div>
+  <div class="space-y-3 p-5">
+    ${wzInput("wzd_name","Full name","e.g. Ricardo Alvarez")}
+    ${wzInput("wzd_truck","Truck #","e.g. T-114")}
+    ${wzInput("wzd_phone","Phone","(###) ###-####")}
+    ${wzSelect("wzd_kind","Type",["Company driver","Owner-operator"])}
+  </div>
+  <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancel</button><button onclick="submitDriver()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Add driver</button></div>`);}
+async function submitDriver(){
+  const name=val("wzd_name");if(!name){toast("Name is required");return;}
+  const truck=val("wzd_truck"),phone=val("wzd_phone"),kind=val("wzd_kind")==="Owner-operator"?"owner_op":"company";
+  const d={name,truck:truck||"—",status:"Available",loads:0,phone:phone||"—",hos:11,chassis:"",kind};
+  DRIVERS.push(d);
+  if(WZ.sb){try{const r=await WZ.sb.from("drivers").insert({name,truck,phone,kind,status:"available",hos:11}).select().single();if(r.error)throw r.error;if(r.data)d._id=r.data.id;}catch(e){toast("Added locally · DB error: "+(e.message||e));}}
+  wzClose();toast("Driver added: "+name);setActive("drivers");
+}
+window.openAddDriver=openAddDriver;window.submitDriver=submitDriver;
+
+/* ---- Create load ---- */
+function nextLoadId(){let mx=24800;LOADS.forEach(l=>{const m=/WZ-(\d+)/.exec(l.id||"");if(m)mx=Math.max(mx,+m[1]);});return "WZ-"+(mx+1);}
+function openCreateLoad(){wzModal(`
+  <div class="border-b border-slate-100 px-5 py-4"><div class="text-base font-semibold text-slate-900">Create load</div></div>
+  <div class="grid grid-cols-2 gap-3 p-5">
+    ${wzInput("wzl_container","Container #","MSCU1234567")}
+    ${wzInput("wzl_ssl","SSL","MSC")}
+    ${wzSelect("wzl_terminal","Terminal",["APM Elizabeth","Maher Terminal","PNCT","GCT Bayonne","GCT NY"])}
+    ${wzSelect("wzl_routing","Routing",["Live","Prepull-Live","Drop and Hook","Prepull drop","1 Way","Export"])}
+    ${wzSelect("wzl_type","Type",["IMP","EXP"])}
+    ${wzSelect("wzl_size","Size",["20'","40'","40HC","45'"])}
+    <div class="col-span-2">${wzInput("wzl_customer","Customer","e.g. Atlantic Wholesale")}</div>
+    <div class="col-span-2">${wzInput("wzl_consignee","Deliver to (Name — City, ST)","Atlantic DC — Edison, NJ")}</div>
+    <div class="col-span-2">${wzInput("wzl_base","Customer rate ($)","e.g. 850","number")}</div>
+    <div class="col-span-2">${wzInput("wzl_lfd","Last free day","","date")}</div>
+  </div>
+  <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancel</button><button onclick="submitLoad()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Create load</button></div>`);}
+async function submitLoad(){
+  const container=val("wzl_container");if(!container){toast("Container # is required");return;}
+  const id=nextLoadId();const base=Number(val("wzl_base"))||0;
+  const rec={id,container,ssl:val("wzl_ssl"),terminal:val("wzl_terminal"),routing:val("wzl_routing"),type:val("wzl_type"),size:val("wzl_size"),customer_name:val("wzl_customer"),consignee:val("wzl_consignee"),lfd:val("wzl_lfd")||null,status:"available",charges:{base:base,fuel:Math.round(base*0.32)},holds:[]};
+  LOADS.unshift(wzMapLoad(rec));
+  if(WZ.sb){try{const r=await WZ.sb.from("loads").insert(rec);if(r.error)throw r.error;}catch(e){toast("Created locally · DB error: "+(e.message||e));}}
+  wzClose();toast("Load created: "+id);setActive("dispatch");
+}
+window.openCreateLoad=openCreateLoad;window.submitLoad=submitLoad;
+
+
 render();
+wzInit();
 </script>
 </body>
 </html>
