@@ -1004,7 +1004,7 @@ window.dragLoad=dragLoad;window.allowDrop=allowDrop;window.dropOn=dropOn;
 
 /* ===== Pointer-based drag (mouse + touch) for the planner ===== */
 let wzDrag=null;
-function planAssign(id,driver){const l=LOADS.find(x=>x.id===id);if(!l)return;if(driver){l.driver=driver;if(l.status==="available")l.status="dispatched";toast("Moved "+id+" to "+driver);}else{l.driver=null;if(l.status==="dispatched")l.status="available";toast(id+" moved to Unassigned");}render();}
+function planAssign(id,driver){const l=LOADS.find(x=>x.id===id);if(!l)return;if(driver){l.driver=driver;if(l.status==="available")l.status="dispatched";toast("Moved "+id+" to "+driver);}else{l.driver=null;if(l.status==="dispatched")l.status="available";toast(id+" moved to Unassigned");}wzUpsertLoad(l);render();}
 function planClearHi(){document.querySelectorAll("[data-drop].wz-drop-on").forEach(x=>x.classList.remove("wz-drop-on"));}
 function planDown(e){
   const card=e.target.closest&&e.target.closest(".plan-card");
@@ -1116,7 +1116,7 @@ function openAssign(id){
    </div>`;
   drawIcons();
 }
-function assignDriver(id,name){const l=LOADS.find(x=>x.id===id);l.driver=name;if(l.status==="available")l.status="dispatched";closeLoad();toast("Assigned "+id+" to "+name);render();}
+function assignDriver(id,name){const l=LOADS.find(x=>x.id===id);l.driver=name;if(l.status==="available")l.status="dispatched";closeLoad();toast("Assigned "+id+" to "+name);wzUpsertLoad(l);render();}
 window.openAssign=openAssign;window.assignDriver=assignDriver;
 
 /* ---------------- BATCH 1: MODULES ---------------- */
@@ -2267,10 +2267,10 @@ function destCity(l){return (l.consignee||"").split("\u2014").pop().trim();}
 function loadDriverPay(l){const dp=driverPay(destCity(l));return dp?dp[3]:0;}
 function invState(){if(!state.inv)state.inv={sel:null,acc:{}};return state.inv;}
 function invSel(id){invState().sel=id;render();}
-function invAddAcc(id){const s=invState();s.acc[id]=(s.acc[id]||0)+75;toast("Detention +$75 captured on "+id);render();}
+function invAddAcc(id){const s=invState();s.acc[id]=(s.acc[id]||0)+75;toast("Detention +$75 captured on "+id);if(WZ.sb){try{WZ.sb.from("load_charges").insert({load_id:id,label:"Detention",amount:75,source:"captured"});}catch(e){}}render();}
 function invLines(l){const c=l.charges||{};const s=invState();const lines=[["Base drayage",c.base||0],["Fuel surcharge",c.fuel||0]];if(c.demurrage)lines.push(["Demurrage recovery",c.demurrage]);if(c.perdiem)lines.push(["Per-diem recovery",c.perdiem]);if(s.acc[l.id])lines.push(["Detention (captured)",s.acc[l.id]]);return lines;}
 function invTotal(l){return invLines(l).reduce((a,x)=>a+x[1],0);}
-function invCreate(id){const l=LOADS.find(x=>x.id===id);toast("Invoice created for "+id+" — $"+invTotal(l).toLocaleString());}
+async function invCreate(id){const l=LOADS.find(x=>x.id===id);const total=invTotal(l);const lines=invLines(l);const number="WZ-INV-"+(10242+(state._invn=(state._invn||0)+1));toast("Invoice "+number+" created for "+id+" - $"+total.toLocaleString());if(l){l.status="completed";}if(WZ.sb){try{const r=await WZ.sb.from("invoices").insert({number,load_id:id,total,status:"sent"}).select().single();if(r.data&&lines.length)await WZ.sb.from("invoice_lines").insert(lines.map(x=>({invoice_id:r.data.id,label:x[0],amount:x[1]})));await wzUpsertLoad(l);}catch(e){toast("Saved locally - DB: "+(e.message||e));}}render();}
 window.invSel=invSel;window.invAddAcc=invAddAcc;window.invCreate=invCreate;
 function mAutoInvoice(){
   const bill=LOADS.filter(l=>["completed","dispatched","enroute"].includes(l.status));
@@ -2292,7 +2292,7 @@ function mAutoInvoice(){
 function dispState(){if(!state.disp)state.disp={sel:null,reason:"No return appointment available"};return state.disp;}
 function dispSel(id){dispState().sel=id;render();}
 function dispReason(r){dispState().reason=r;render();}
-function dispGen(c){toast("Dispute packet generated for "+c);}
+async function dispGen(c){const ds=dispState();const l=LOADS.find(x=>x.id===ds.sel);const amt=l?(((l.charges&&l.charges.demurrage)||0)+((l.charges&&l.charges.perdiem)||0)):0;toast("Dispute packet generated for "+c);if(WZ.sb){try{await WZ.sb.from("disputes").insert({container:c,ssl:l&&l.ssl,terminal:l&&l.terminal,reason:ds.reason,amount:amt,status:"submitted"});}catch(e){toast("Saved locally - DB: "+(e.message||e));}}}
 window.dispSel=dispSel;window.dispReason=dispReason;window.dispGen=dispGen;
 function daysToLFD(d){try{const t=new Date("2026-09-15");const x=new Date(d);return Math.round((x-t)/86400000);}catch(e){return null;}}
 function lfdTier(days){if(days==null)return["\u2014","text-slate-400"];if(days<0)return[Math.abs(days)+"d overdue","text-red-600 font-semibold"];if(days<=1)return[days+"d left","text-red-600 font-semibold"];if(days<=3)return[days+"d left","text-amber-600 font-medium"];return[days+"d left","text-emerald-600"];}
@@ -2469,6 +2469,13 @@ async function wzLoad(){
   try{const d=await WZ.sb.from("drivers").select("*");if(d.data&&d.data.length){DRIVERS.length=0;d.data.forEach(r=>DRIVERS.push({name:r.name,truck:r.truck||"—",status:r.status||"Available",loads:0,phone:r.phone||"—",hos:(r.hos==null?11:r.hos),chassis:r.chassis||"",kind:r.kind||"company",_id:r.id}));}}catch(e){}
   try{const l=await WZ.sb.from("loads").select("*");if(l.data&&l.data.length){LOADS.length=0;l.data.forEach(r=>LOADS.push(wzMapLoad(r)));}}catch(e){}
 }
+async function wzUpsertLoad(l){if(!WZ.sb||!l)return;try{await WZ.sb.from("loads").upsert({id:l.id,container:l.container,mbl:l.mbl,ssl:l.ssl,size:l.size,routing:l.routing,type:l.type,status:l.status,terminal:l.terminal,lfd:(/\d{4}-\d{2}-\d{2}/.test(l.lfd)?l.lfd:null),consignee:l.consignee,customer_name:l.customer,driver_name:l.driver,holds:l.holds||[],charges:l.charges||{}});}catch(e){}}
+window.wzUpsertLoad=wzUpsertLoad;
+async function wzSeedIfEmpty(){
+  if(!WZ.sb)return;
+  try{const d=await WZ.sb.from("drivers").select("id").limit(1);if(!d.error&&(!d.data||!d.data.length)){await WZ.sb.from("drivers").insert(DRIVERS.map(x=>({name:x.name,truck:x.truck,status:x.status||"Available",phone:x.phone,hos:(x.hos==null?11:x.hos),chassis:x.chassis||"",kind:x.kind||"company"})));}}catch(e){}
+  try{const l=await WZ.sb.from("loads").select("id").limit(1);if(!l.error&&(!l.data||!l.data.length)){await WZ.sb.from("loads").insert(LOADS.map(x=>({id:x.id,container:x.container,mbl:x.mbl,ssl:x.ssl,size:x.size,routing:x.routing,type:x.type,status:x.status,terminal:x.terminal,lfd:(/\d{4}-\d{2}-\d{2}/.test(x.lfd)?x.lfd:null),consignee:x.consignee,customer_name:x.customer,driver_name:x.driver,holds:x.holds||[],charges:x.charges||{}})));}}catch(e){}
+}
 async function wzConnect(url,key,silent){
   try{
     if(!window.supabase){toast("Supabase library still loading — try again in a second");return;}
@@ -2477,6 +2484,7 @@ async function wzConnect(url,key,silent){
     WZ.sb=window.supabase.createClient(WZ.url,WZ.key);
     try{localStorage.setItem("wz_sb_url",WZ.url);localStorage.setItem("wz_sb_key",WZ.key);}catch(_){}
     WZ.connected=true;
+    await wzSeedIfEmpty();
     await wzLoad();
     if(!silent)toast("Database connected");
     render();
