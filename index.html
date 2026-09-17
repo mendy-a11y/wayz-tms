@@ -605,7 +605,7 @@ function mDispatch(){
           <td class="px-4 py-3 tabular ${lfd.cls}">${lfd.txt}${accrualCell(l)}</td>
           <td class="px-4 py-3">${holdBadges(l.holds)}</td>
           <td class="px-4 py-3">${l.driver?`<span class="text-slate-700">${l.driver}</span>`:`<button onclick="event.stopPropagation();openAssign('${l.id}')" class="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Assign</button>`}</td>
-          <td class="px-4 py-3 text-xs text-slate-500">${l.appt}</td>
+          <td class="px-4 py-3 text-xs text-slate-500">${fmtAppt(l.pickupAppt||l.appt)}</td>
           <td class="px-4 py-3 text-right"><i data-lucide="chevron-right" class="h-4 w-4 text-slate-300 inline"></i></td>
         </tr>`;}).join("")}
       </tbody></table>
@@ -650,6 +650,13 @@ function openLoad(id){
           <div class="h-8 w-px bg-slate-200"></div>
           <div class="flex-1"><div class="text-xs text-slate-500">Holds</div><div class="mt-1">${holdBadges(l.holds)}</div></div>
         </div>
+      </div>
+      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Appointments</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="mb-1 block text-xs text-slate-500">Pickup date / time</label><input id="ol_pappt" type="datetime-local" value="${toLocalDT(l.pickupAppt)}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"/></div>
+          <div><label class="mb-1 block text-xs text-slate-500">Delivery date / time</label><input id="ol_dappt" type="datetime-local" value="${toLocalDT(l.deliveryAppt)}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"/></div>
+        </div>
+        <button onclick="saveAppts('${l.id}')" class="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Save appointments</button>
       </div>
       <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Routing</h3>
         <div class="flex flex-wrap gap-2">${ROUTING.map(r=>`<button onclick="setRouting('${l.id}','${r}')" class="rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 transition ${l.routing===r?'bg-slate-900 text-white ring-slate-900':'bg-white text-slate-600 ring-slate-200 hover:ring-sky-400'}">${r}</button>`).join("")}</div>
@@ -2556,13 +2563,17 @@ function openInviteUser(){wzModal(`<div class="border-b border-slate-100 px-5 py
 function submitInvite(){const email=val("wzu_email");if(!email){toast("Email is required");return;}const rm={"Owner / Admin":"owner","Dispatcher":"dispatch","Billing / AR":"billing","Safety & Compliance":"safety","Read-only":"readonly"};USERS.push({name:val("wzu_name")||email,email:email,role:rm[val("wzu_role")]||"readonly",status:"Invited",last:"pending"});wzClose();toast("Invite sent to "+email);setActive("roles");}
 window.openInviteUser=openInviteUser;window.submitInvite=submitInvite;
 
-function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||null,consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
+function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
 async function wzLoad(){
   if(!WZ.sb)return;
   try{const d=await WZ.sb.from("drivers").select("*");if(!d.error){DRIVERS.length=0;(d.data||[]).forEach(r=>DRIVERS.push({name:r.name,truck:r.truck||"—",status:r.status||"Available",loads:0,phone:r.phone||"—",hos:(r.hos==null?11:r.hos),chassis:r.chassis||"",kind:r.kind||"company",_id:r.id}));}}catch(e){}
   try{const l=await WZ.sb.from("loads").select("*");if(!l.error){LOADS.length=0;(l.data||[]).forEach(r=>LOADS.push(wzMapLoad(r)));}}catch(e){}
 }
-async function wzUpsertLoad(l){if(!WZ.sb||!l)return;try{await WZ.sb.from("loads").upsert({id:l.id,container:l.container,mbl:l.mbl,ssl:l.ssl,size:l.size,routing:l.routing,type:l.type,status:l.status,terminal:l.terminal,lfd:(/\d{4}-\d{2}-\d{2}/.test(l.lfd)?l.lfd:null),consignee:l.consignee,customer_name:l.customer,driver_name:l.driver,holds:l.holds||[],charges:l.charges||{}});}catch(e){}}
+function toLocalDT(s){if(!s)return"";s=String(s).replace(" ","T");var m=s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);return m?m[0]:"";}
+function fmtAppt(s){if(!s)return"—";try{var d=new Date(String(s).replace(" ","T"));if(isNaN(d))return s;return d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}catch(e){return s;}}
+function saveAppts(id){var l=LOADS.find(function(x){return x.id===id;});if(!l)return;l.pickupAppt=val("ol_pappt");l.deliveryAppt=val("ol_dappt");l.appt=l.pickupAppt||l.appt;wzUpsertLoad(l);toast("Appointments saved for "+id);openLoad(id);render();}
+window.saveAppts=saveAppts;
+async function wzUpsertLoad(l){if(!WZ.sb||!l)return;try{await WZ.sb.from("loads").upsert({id:l.id,container:l.container,mbl:l.mbl,ssl:l.ssl,size:l.size,routing:l.routing,type:l.type,status:l.status,terminal:l.terminal,lfd:(/\d{4}-\d{2}-\d{2}/.test(l.lfd)?l.lfd:null),pickup_appt:l.pickupAppt||null,delivery_appt:l.deliveryAppt||null,appt:l.appt||null,consignee:l.consignee,customer_name:l.customer,driver_name:l.driver,holds:l.holds||[],charges:l.charges||{}});}catch(e){}}
 window.wzUpsertLoad=wzUpsertLoad;
 
 async function wzConnect(url,key,silent){
@@ -2612,6 +2623,7 @@ function openCreateLoad(){wzModal(`
   <div class="grid grid-cols-2 gap-3 p-5">
     ${wzInput("wzl_container","Container #","MSCU1234567")}
     ${wzInput("wzl_ssl","SSL","MSC")}
+    <div class="col-span-2">${wzInput("wzl_mbl","MBL #","MEDU12345678")}</div>
     ${wzSelect("wzl_terminal","Terminal",["APM Elizabeth","Maher Terminal","PNCT","GCT Bayonne","GCT NY"])}
     ${wzSelect("wzl_routing","Routing",["Live","Prepull-Live","Drop and Hook","Prepull drop","1 Way","Export"])}
     ${wzSelect("wzl_type","Type",["IMP","EXP"])}
@@ -2619,13 +2631,15 @@ function openCreateLoad(){wzModal(`
     <div class="col-span-2">${wzInput("wzl_customer","Customer","e.g. Atlantic Wholesale")}</div>
     <div class="col-span-2">${wzInput("wzl_consignee","Deliver to (Name — City, ST)","Atlantic DC — Edison, NJ")}</div>
     <div class="col-span-2">${wzInput("wzl_base","Customer rate ($)","e.g. 850","number")}</div>
+    ${wzInput("wzl_pappt","Pickup date / time","","datetime-local")}
+    ${wzInput("wzl_dappt","Delivery date / time","","datetime-local")}
     <div class="col-span-2">${wzInput("wzl_lfd","Last free day","","date")}</div>
   </div>
   <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancel</button><button onclick="submitLoad()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Create load</button></div>`);}
 async function submitLoad(){
   const container=val("wzl_container");if(!container){toast("Container # is required");return;}
   const id=nextLoadId();const base=Number(val("wzl_base"))||0;
-  const rec={id,container,ssl:val("wzl_ssl"),terminal:val("wzl_terminal"),routing:val("wzl_routing"),type:val("wzl_type"),size:val("wzl_size"),customer_name:val("wzl_customer"),consignee:val("wzl_consignee"),lfd:val("wzl_lfd")||null,status:"available",charges:{base:base,fuel:Math.round(base*0.32)},holds:[]};
+  const rec={id,container,mbl:val("wzl_mbl"),ssl:val("wzl_ssl"),terminal:val("wzl_terminal"),routing:val("wzl_routing"),type:val("wzl_type"),size:val("wzl_size"),customer_name:val("wzl_customer"),consignee:val("wzl_consignee"),lfd:val("wzl_lfd")||null,pickup_appt:val("wzl_pappt")||null,delivery_appt:val("wzl_dappt")||null,appt:val("wzl_pappt")||null,status:"available",charges:{base:base,fuel:Math.round(base*0.32)},holds:[]};
   LOADS.unshift(wzMapLoad(rec));
   if(WZ.sb){try{const r=await WZ.sb.from("loads").insert(rec);if(r.error)throw r.error;}catch(e){toast("Created locally · DB error: "+(e.message||e));}}
   wzClose();toast("Load created: "+id);wzConfetti();setActive("dispatch");
