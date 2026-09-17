@@ -289,21 +289,6 @@ const NAV = [
     {key:"settlements",label:"Settlements",icon:"wallet"},
     {key:"scorecards",label:"Scorecards",icon:"gauge"},
   ]},
-  {section:"Finance",items:[
-    {key:"arap",label:"AR / AP",icon:"receipt"},
-    {key:"accessorials",label:"Accessorial Rates",icon:"sliders-horizontal"},
-    {key:"invoicing",label:"Invoicing",icon:"file-text"},
-    {key:"autoinvoice",label:"Auto-Invoicing",icon:"file-check-2"},
-    {key:"perdiem",label:"Per-Diem & D&D",icon:"timer"},
-    {key:"dunning",label:"AR Reminders",icon:"mail"},
-    {key:"batchinvoice",label:"Batch Invoicing",icon:"files"},
-    {key:"statements1099",label:"1099 & Statements",icon:"file-text"},
-    {key:"fsc",label:"Fuel Surcharge",icon:"fuel"},
-    {key:"ppcwaterfall",label:"Profit / Container",icon:"bar-chart-3"},
-    {key:"cashflow",label:"Cash-Flow Forecast",icon:"line-chart"},
-    {key:"vendorbills",label:"Vendor Bills",icon:"file-input"},
-    {key:"ezpass",label:"E-ZPass Tolls",icon:"circle-dollar-sign",tag:1},
-  ]},
   {section:"Customer",items:[
     {key:"customers",label:"Customer Portal",icon:"building-2"},
     {key:"contractrates",label:"Customer Rates",icon:"file-text"},
@@ -342,15 +327,32 @@ const NAV = [
     {key:"driveraiengine",label:"AI Load Matching",icon:"cpu",tag:1},
     {key:"nlreports",label:"Ask Your Data",icon:"message-circle",tag:1},
   ]},
-  {section:"Accounting",items:[
-    {key:"books",label:"Books Dashboard",icon:"book-open"},
+  {section:"Wayz Books",items:[
+    {key:"books",label:"Dashboard",icon:"book-open"},
     {key:"pnl",label:"Profit & Loss",icon:"trending-up"},
     {key:"balance",label:"Balance Sheet",icon:"scale"},
-    {key:"expenses",label:"Expenses",icon:"receipt"},
-    {key:"apbills",label:"Bills (A/P)",icon:"file-input"},
     {key:"arbooks",label:"Invoices (A/R)",icon:"file-text"},
+    {key:"payments",label:"Payments",icon:"banknote"},
+    {key:"statements",label:"Statements",icon:"mail"},
+    {key:"autoinvoice",label:"Auto-Invoicing",icon:"file-check-2"},
+    {key:"batchinvoice",label:"Batch Invoicing",icon:"files"},
+    {key:"apbills",label:"Bills (A/P)",icon:"file-input"},
+    {key:"vendorbills",label:"Vendor Bills",icon:"file-input"},
+    {key:"expenses",label:"Expenses",icon:"receipt"},
     {key:"bank",label:"Banking",icon:"landmark"},
+    {key:"reconcile",label:"Reconciliation",icon:"check-check"},
     {key:"coa",label:"Chart of Accounts",icon:"list-tree"},
+    {key:"arap",label:"A/R & A/P Aging",icon:"receipt"},
+    {key:"aging",label:"Aging Reports",icon:"calendar-clock"},
+    {key:"dunning",label:"Reminders",icon:"mail"},
+    {key:"perdiem",label:"Per-Diem & D&D",icon:"timer"},
+    {key:"fsc",label:"Fuel Surcharge",icon:"fuel"},
+    {key:"cashflow",label:"Cash-Flow",icon:"line-chart"},
+    {key:"ppcwaterfall",label:"Profit / Container",icon:"bar-chart-3"},
+    {key:"statements1099",label:"1099s",icon:"file-text"},
+    {key:"accessorials",label:"Accessorial Rates",icon:"sliders-horizontal"},
+    {key:"invoicing",label:"Invoicing",icon:"file-text"},
+    {key:"ezpass",label:"E-ZPass Tolls",icon:"circle-dollar-sign",tag:1},
   ]},
   {section:"System",items:[
     {key:"roles",label:"Users & Roles",icon:"users"},
@@ -2111,13 +2113,12 @@ const SECTION_HUBS=[
   {section:"Operations",label:"Operations",icon:"truck",land:"dispatch"},
   {section:"Assets",label:"Assets & Equipment",icon:"warehouse",land:"chassis"},
   {section:"Drivers",label:"Drivers",icon:"users",land:"drivers"},
-  {section:"Finance",label:"Finance",icon:"receipt",land:"arap"},
   {section:"Customer",label:"Customer & Sales",icon:"building-2",land:"customers"},
   {section:"Integrations",label:"Integrations",icon:"plug",land:"integrations"},
   {section:"Insights",label:"Insights",icon:"bar-chart-3",land:"execdash"},
   {section:"OTR",label:"OTR / FTL",icon:"route",land:"otr"},
   {section:"AI",label:"AI Assistant",icon:"sparkles",land:"ai"},
-  {section:"Accounting",label:"Accounting",icon:"book-open",land:"books"},
+  {section:"Wayz Books",label:"Wayz Books",icon:"book-open",land:"books"},
   {section:"System",label:"Settings",icon:"settings",land:"roles"},
 ];
 
@@ -2398,6 +2399,75 @@ function mBalance(){
 const BK_COA=[["Income",["4000 Sales — Drayage","4010 Sales — OTR","4020 Accessorials","4090 Other income"]],["Cost of Goods Sold",["5000 Driver pay","5010 Tolls","5020 Chassis","5030 Trailer lease","5040 Fuel"]],["Expenses",["6000 Insurance","6010 Owner payroll","6020 Rent","6030 Software","6040 GPS / ELD","6050 Load boards","6060 Maintenance","6090 Office & other"]],["Assets",["1000 Checking","1200 Accounts receivable","1500 Equipment","1510 Chassis / yard"]],["Liabilities",["2000 Accounts payable","2100 Credit cards","2200 Insurance financing","2300 Equipment loans"]],["Equity",["3000 Owner capital","3900 Retained earnings"]]];
 function mCOA(){const cols=BK_COA.map(g=>`<div class="wz-card"><div class="wz-card-head">${g[0]}</div><div class="divide-y divide-slate-100">${g[1].map(a=>`<div class="px-4 py-2.5 text-sm text-slate-700">${a}</div>`).join("")}</div></div>`).join("");return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="list-tree" class="h-4 w-4"></i> Chart of accounts.</div><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">${cols}</div></div>`;}
 
+/* ================= WAYZ BOOKS — Payments + Statements ================= */
+function bkParse(x){return Number(String(x).replace(/[^0-9.]/g,""))||0;}
+function payState(){if(!state.pay)state.pay={ledger:[]};return state.pay;}
+async function payApply(num){const inv=BK_INV.find(i=>i[1]===num);if(!inv)return;if(inv[4]==="Paid"){toast(num+" already paid");return;}inv[4]="Paid";payState().ledger.unshift({num:num,customer:inv[0],amount:inv[2],date:"today"});toast("Payment applied to "+num+" ("+inv[2]+")");if(WZ.sb){try{await WZ.sb.from("invoices").update({status:"paid"}).eq("number",num);}catch(e){}}render();}
+window.payApply=payApply;
+function mPayments(){
+  const open=BK_INV.filter(i=>i[4]==="Open");const paid=BK_INV.filter(i=>i[4]==="Paid");const led=payState().ledger;
+  const openTot=open.reduce((a,i)=>a+bkParse(i[2]),0);
+  const rows=open.length?open.map(i=>`<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">${i[0]}</td><td class="px-4 py-3 font-mono text-xs text-slate-600">${i[1]}</td><td class="px-4 py-3 tabular text-slate-800">${i[2]}</td><td class="px-4 py-3 text-slate-500">${i[3]}</td><td class="px-4 py-3"><div class="flex gap-1.5"><button onclick="payApply('${i[1]}')" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Apply</button><button onclick="openPayLink('${i[1]}')" class="wz-btn-brand rounded-md px-2.5 py-1.5 text-[11px] font-semibold">Pay online</button><button onclick="toast(&#39;Pay link copied&#39;)" class="rounded-md border border-slate-200 px-2 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50">Copy link</button></div></td></tr>`).join(""):'<tr><td colspan="5" class="px-4 py-6 text-center text-xs text-slate-400">All invoices paid</td></tr>';
+  const ledRows=led.length?led.map(p=>`<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-700">${p.customer}</td><td class="px-4 py-3 font-mono text-xs text-slate-600">${p.num}</td><td class="px-4 py-3 tabular text-emerald-600">${p.amount}</td><td class="px-4 py-3 text-slate-500">${p.date}</td></tr>`).join(""):'<tr><td colspan="4" class="px-4 py-6 text-center text-xs text-slate-400">No payments applied yet</td></tr>';
+  const k=kpis([["Open A/R","$"+openTot.toLocaleString(),"text-amber-600"],["Applied (today)",String(led.length)],["Paid invoices",String(paid.length),"text-emerald-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="banknote" class="h-4 w-4"></i> Apply customer payments against open invoices.</div>${k}<div class="grid gap-4 xl:grid-cols-2"><div>${panel("Open invoices",tbl(["Customer","Invoice","Amount","Date","Action"],rows))}</div><div>${panel("Payments received",tbl(["Customer","Invoice","Amount","Date"],ledRows))}</div></div></div>`;
+}
+function stmtState(){if(!state.stmt)state.stmt={cust:null};return state.stmt;}
+function stmtPick(c){stmtState().cust=c;render();}
+function stmtSend(c){toast("Statement sent to "+c);}
+function stmtDownload(c){const rows=BK_INV.filter(i=>i[0]===c);wzCSV("statement-"+c.replace(/\s+/g,"-")+".csv",["Invoice","Amount","Date","Status"],rows.map(i=>[i[1],i[2],i[3],i[4]]));}
+window.stmtPick=stmtPick;window.stmtSend=stmtSend;window.stmtDownload=stmtDownload;
+function mStatements(){
+  const custs=BK_INV.map(i=>i[0]).filter((v,idx,a)=>a.indexOf(v)===idx);const s=stmtState();if(!s.cust)s.cust=custs[0];const cur=s.cust;
+  const chips=custs.map(c=>`<button onclick="stmtPick('${c}')" class="rounded-lg px-3 py-1.5 text-sm font-medium ${c===cur?'bg-sky-50 text-sky-700 ring-1 ring-sky-200':'text-slate-600 hover:bg-slate-100'}">${c}</button>`).join("");
+  const inv=BK_INV.filter(i=>i[0]===cur);const openTot=inv.filter(i=>i[4]==="Open").reduce((a,i)=>a+bkParse(i[2]),0);
+  const rows=inv.map(i=>`<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-mono text-xs text-slate-600">${i[1]}</td><td class="px-4 py-3 tabular text-slate-800">${i[2]}</td><td class="px-4 py-3 text-slate-500">${i[3]}</td><td class="px-4 py-3">${i[4]==="Open"?'<span class="text-xs text-amber-600">Open</span>':'<span class="text-xs text-emerald-600">Paid</span>'}</td></tr>`).join("");
+  const k=kpis([["Customer",cur],["Open balance","$"+openTot.toLocaleString(),"text-amber-600"],["Invoices",String(inv.length)]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="mail" class="h-4 w-4"></i> Generate and send customer account statements.</div><div class="mb-4 flex flex-wrap gap-1.5">${chips}</div>${k}${panel("Statement - "+cur,tbl(["Invoice","Amount","Date","Status"],rows))}<div class="mt-3 flex gap-2"><button onclick="stmtSend('${cur}')" class="wz-btn-brand rounded-lg px-3.5 py-2 text-sm font-semibold">Send statement</button><button onclick="stmtDownload('${cur}')" class="rounded-lg border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Download (CSV)</button></div></div>`;
+}
+
+/* ================= WAYZ BOOKS — Pay links + Reconciliation + Aging ================= */
+function openPayLink(num){const inv=BK_INV.find(i=>i[1]===num);if(!inv)return;wzModal(`
+  <div class="border-b border-slate-100 px-5 py-4"><div class="text-base font-semibold text-slate-900">Pay invoice ${num}</div><div class="text-xs text-slate-500">${inv[0]}</div></div>
+  <div class="p-5"><div class="mb-4 rounded-xl bg-slate-50 p-4 text-center"><div class="text-xs text-slate-500">Amount due</div><div class="text-3xl font-semibold text-slate-900" style="font-family:var(--font-display)">${inv[2]}</div></div>
+    <div class="mb-3 flex gap-2"><button class="flex-1 rounded-lg border border-sky-400 bg-sky-50 py-2 text-sm font-medium text-sky-700">Card</button><button class="flex-1 rounded-lg border border-slate-200 py-2 text-sm text-slate-600">ACH bank</button></div>
+    <div class="space-y-2">${wzInput("pl_card","Card number","4242 4242 4242 4242")}<div class="grid grid-cols-2 gap-2">${wzInput("pl_exp","MM / YY","12/28")}${wzInput("pl_cvc","CVC","123")}</div></div>
+    <div class="mt-2 text-[11px] text-slate-400">Demo checkout. Connect Stripe / ACH in Settings to charge for real.</div></div>
+  <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">Cancel</button><button onclick="payPaid('${num}')" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Pay ${inv[2]}</button></div>`);}
+function payPaid(num){wzClose();payApply(num);}
+window.openPayLink=openPayLink;window.payPaid=payPaid;
+
+function reconState(){if(!state.recon)state.recon={matched:{}};return state.recon;}
+function reconMatch(i){const r=reconState();r.matched[i]=!r.matched[i];render();}
+window.reconMatch=reconMatch;
+function txSigned(s){return bkParse(s)*(String(s)[0]==="-"?-1:1);}
+function mReconcile(){
+  const r=reconState();
+  const stmtBal=BK_TX.reduce((a,t)=>a+txSigned(t[3]),0);
+  const clearedBal=BK_TX.reduce((a,t,idx)=>a+(r.matched[idx]?txSigned(t[3]):0),0);
+  const diff=stmtBal-clearedBal;
+  const rows=BK_TX.map((t,idx)=>{const on=!!r.matched[idx];const neg=String(t[3])[0]==="-";return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-500">${t[0]}</td><td class="px-4 py-3 font-medium text-slate-800">${t[1]}</td><td class="px-4 py-3 text-slate-500">${t[2]}</td><td class="px-4 py-3 text-right tabular ${neg?'text-slate-700':'text-emerald-600'}">${t[3]}</td><td class="px-4 py-3 text-center"><button onclick="reconMatch(${idx})" class="rounded-md px-2.5 py-1 text-[11px] font-medium ${on?'bg-emerald-500 text-white':'border border-slate-200 text-slate-600 hover:bg-slate-50'}">${on?'Cleared':'Match'}</button></td></tr>`;}).join("");
+  const matched=Object.values(r.matched).filter(Boolean).length;
+  const k=kpis([["Statement balance",bkFmt(stmtBal)],["Cleared",bkFmt(clearedBal)],["Difference",bkFmt(diff),Math.abs(diff)<0.5?"text-emerald-600":"text-amber-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center justify-between"><div class="flex items-center gap-2 text-sm text-slate-500"><i data-lucide="check-check" class="h-4 w-4"></i> Match bank transactions to your books - Chase Bus 2302.</div><button onclick="toast('Reconciliation saved')" class="wz-btn-brand rounded-lg px-3.5 py-2 text-sm font-semibold">Finish reconciliation</button></div>${k}${panel(matched+" of "+BK_TX.length+" cleared",tbl(["Date","Payee","Category","Amount","Match"],rows))}</div>`;
+}
+
+const AGE_LABELS=["Current","1-30","31-60","61-90","90+"];
+function agingBucket(dateStr){try{const d=new Date(dateStr+", 2026");const today=new Date("2026-09-15");const days=Math.round((today-d)/86400000);if(days<=0)return 0;if(days<=30)return 1;if(days<=60)return 2;if(days<=90)return 3;return 4;}catch(e){return 4;}}
+function agingTable(rowsObj){const parties=Object.keys(rowsObj);if(!parties.length)return '<table class="wz-tbl w-full text-sm"><tbody><tr><td class="px-4 py-6 text-center text-xs text-slate-400">Nothing outstanding</td></tr></tbody></table>';
+  const head=["Party",...AGE_LABELS,"Total"];
+  const body=parties.map(p=>{const b=rowsObj[p];const tot=b.reduce((a,x)=>a+x,0);return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">${p}</td>${b.map((v,i)=>`<td class="px-4 py-3 text-right tabular ${v&&i>=3?'text-red-600':v&&i>=2?'text-amber-600':v?'text-slate-700':'text-slate-300'}">${v?'$'+v.toLocaleString():'-'}</td>`).join("")}<td class="px-4 py-3 text-right tabular font-semibold text-slate-900">$${tot.toLocaleString()}</td></tr>`;}).join("");
+  return `<table class="wz-tbl w-full text-sm"><thead><tr>${head.map((h,i)=>`<th class="${i?'text-right':''}">${h}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table>`;
+}
+function mAging(){
+  const ar={};BK_INV.filter(i=>i[4]==="Open").forEach(i=>{const b=agingBucket(i[3]);ar[i[0]]=ar[i[0]]||[0,0,0,0,0];ar[i[0]][b]+=bkParse(i[2]);});
+  const ap={};BK_BILLS.filter(x=>x[4]==="Open").forEach(x=>{const b=agingBucket(x[3]);ap[x[0]]=ap[x[0]]||[0,0,0,0,0];ap[x[0]][b]+=bkParse(x[2]);});
+  const arTot=BK_INV.filter(i=>i[4]==="Open").reduce((a,i)=>a+bkParse(i[2]),0);
+  const apTot=BK_BILLS.filter(x=>x[4]==="Open").reduce((a,x)=>a+bkParse(x[2]),0);
+  const k=kpis([["A/R outstanding","$"+arTot.toLocaleString(),"text-amber-600"],["A/P outstanding","$"+apTot.toLocaleString()],["Aging buckets","5"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="calendar-clock" class="h-4 w-4"></i> A/R and A/P aging - who owes you, and who you owe, by age.</div>${k}<div class="space-y-4">${panel("Accounts receivable aging",agingTable(ar))}${panel("Accounts payable aging",agingTable(ap))}</div></div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2442,7 +2512,7 @@ function render(){
     demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
-    books:mBooks,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
+    books:mBooks,payments:mPayments,statements:mStatements,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
     roles:mRoles,
     settings:mSettings,
   };
