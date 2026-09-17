@@ -590,7 +590,11 @@ const LEG_ICON={
 };
 
 function openLoad(id){
-  const l=LOADS.find(x=>x.id===id);const lfd=lfdMeta(l.lfd);
+  const l=LOADS.find(x=>x.id===id);if(!l)return;
+  try{l.legs=(l.legs&&l.legs.length)?l.legs:buildLegs(l,l.routing);}catch(e){l.legs=l.legs||[];}
+  l.docs=l.docs||[];l.charges=l.charges||{};l.ref=l.ref||"";l.chassis=l.chassis||"—";
+  if(l.charges.total==null)l.charges.total=(l.charges.base||0)+(l.charges.fuel||0)+(l.charges.demurrage||0)+(l.charges.perdiem||0);
+  const lfd=l.lfd?lfdMeta(l.lfd):{cls:"text-slate-400",txt:"—"};
   const fact=(lab,val,mono)=>`<div><div class="text-xs text-slate-500">${lab}</div><div class="text-sm text-slate-800 ${mono?'font-mono':''}">${val}</div></div>`;
   const row=(lab,val,warn)=>`<div class="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-0"><span class="${warn?'text-amber-700':'text-slate-600'}">${lab}</span><span class="tabular ${warn?'font-medium text-amber-700':'text-slate-800'}">${money(val)}</span></div>`;
   const el=document.getElementById("slideover");
