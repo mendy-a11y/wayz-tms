@@ -146,6 +146,36 @@ body{color:var(--text)!important;font-family:var(--font-ui)!important;
 .wz-toast{display:flex;align-items:center;gap:8px;background:var(--text);color:var(--surface);font-size:13px;font-weight:500;padding:10px 14px;border-radius:10px;box-shadow:0 14px 34px -10px rgba(0,0,0,.5);opacity:0;transform:translateY(10px);transition:opacity .2s ease,transform .2s ease}
 .wz-toast.wz-toast-in{opacity:1;transform:translateY(0)}
 .wz-toast-dot{width:8px;height:8px;border-radius:50%;background:#34d399;flex-shrink:0}
+/* ===== smooth + cool polish ===== */
+#content>div{animation:wzFadeUp .34s cubic-bezier(.22,.61,.36,1) both}
+@keyframes wzFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.wz-card{transition:box-shadow .2s ease,transform .15s ease}
+.wz-card:hover{box-shadow:var(--shadow-lg)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.55;
+  background:radial-gradient(55vw 40vw at 10% -8%,rgba(56,189,248,.10),transparent 60%),radial-gradient(50vw 42vw at 102% -2%,rgba(99,102,241,.10),transparent 55%);
+  animation:wzAurora 20s ease-in-out infinite alternate}
+[data-theme="dark"] body::after{opacity:.8}
+@keyframes wzAurora{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(0,2%,0) scale(1.06)}}
+.wz-logoplate{position:relative;overflow:hidden}
+.wz-logoplate::after{content:"";position:absolute;top:0;left:-45%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(56,189,248,.35),transparent);animation:wzScan 6s ease-in-out infinite}
+@keyframes wzScan{0%,55%{left:-45%}78%,100%{left:130%}}
+.wz-side .nav-link.wz-on{box-shadow:inset 0 0 0 1px rgba(56,189,248,.25),0 0 22px -8px rgba(56,189,248,.55)}
+.nav-link{transition:transform .12s ease,background .15s ease,color .15s ease}
+.wz-side .nav-link:active{transform:scale(.98)}
+.wz-live{position:relative;display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399}
+.wz-live::after{content:"";position:absolute;inset:0;border-radius:50%;background:#34d399;animation:wzPing 1.6s cubic-bezier(0,0,.2,1) infinite}
+.wz-off{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b}
+@keyframes wzPing{0%{transform:scale(1);opacity:.7}80%,100%{transform:scale(2.6);opacity:0}}
+.wz-clock{font-variant-numeric:tabular-nums;font-family:var(--font-display)}
+button{transition:transform .08s ease}
+button:active{transform:scale(.97)}
+.wz-btn-brand{transition:filter .15s ease,transform .08s ease,box-shadow .2s ease}
+.wz-btn-brand:hover{box-shadow:0 8px 22px -6px rgba(47,127,224,.7)}
+.wz-toast{position:relative;overflow:hidden}
+.wz-toast::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:rgba(52,211,153,.9);transform-origin:left;animation:wzToastBar 2.6s linear forwards}
+@keyframes wzToastBar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.wz-confetti{position:fixed;top:-12px;z-index:10001;width:9px;height:14px;border-radius:2px;pointer-events:none;animation:wzFall linear forwards}
+@keyframes wzFall{to{transform:translateY(106vh) rotate(720deg);opacity:.85}}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -190,6 +220,7 @@ body{color:var(--text)!important;font-family:var(--font-ui)!important;
         <input oninput="doSearch(this.value)" placeholder="Search loads, containers, MBL, customers…" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-500/20" />
       </div>
       <div class="ml-auto flex items-center gap-1.5">
+        <div class="mr-1 hidden items-center gap-2 rounded-xl border border-slate-200 bg-white/60 px-3 py-2 text-xs text-slate-500 lg:flex"><span id="wzConn" class="wz-off"></span><span id="wzClock" class="wz-clock">—</span></div>
         <button onclick="toggleTheme()" title="Toggle theme" class="wz-icon-btn rounded-xl p-2.5"><i id="themeIconTop" data-lucide="moon" class="h-[18px] w-[18px]"></i></button>
         <button onclick="setActive('notifications')" class="wz-icon-btn relative rounded-xl p-2.5">
           <i data-lucide="bell" class="h-[18px] w-[18px]"></i>
@@ -2247,7 +2278,7 @@ function invSel(id){invState().sel=id;render();}
 function invAddAcc(id){const s=invState();s.acc[id]=(s.acc[id]||0)+75;toast("Detention +$75 captured on "+id);if(WZ.sb){try{WZ.sb.from("load_charges").insert({load_id:id,label:"Detention",amount:75,source:"captured"});}catch(e){}}render();}
 function invLines(l){const c=l.charges||{};const s=invState();const lines=[["Base drayage",c.base||0],["Fuel surcharge",c.fuel||0]];if(c.demurrage)lines.push(["Demurrage recovery",c.demurrage]);if(c.perdiem)lines.push(["Per-diem recovery",c.perdiem]);if(s.acc[l.id])lines.push(["Detention (captured)",s.acc[l.id]]);return lines;}
 function invTotal(l){return invLines(l).reduce((a,x)=>a+x[1],0);}
-async function invCreate(id){const l=LOADS.find(x=>x.id===id);const total=invTotal(l);const lines=invLines(l);const number="WZ-INV-"+(10242+(state._invn=(state._invn||0)+1));BK_INV.unshift([(l&&l.customer)||"Customer",number,"$"+total.toLocaleString(),"today","Open"]);toast("Invoice "+number+" created for "+id+" - $"+total.toLocaleString());if(l){l.status="completed";}if(WZ.sb){try{const r=await WZ.sb.from("invoices").insert({number,load_id:id,total,status:"sent"}).select().single();if(r.data&&lines.length)await WZ.sb.from("invoice_lines").insert(lines.map(x=>({invoice_id:r.data.id,label:x[0],amount:x[1]})));await wzUpsertLoad(l);}catch(e){toast("Saved locally - DB: "+(e.message||e));}}render();}
+async function invCreate(id){const l=LOADS.find(x=>x.id===id);const total=invTotal(l);const lines=invLines(l);const number="WZ-INV-"+(10242+(state._invn=(state._invn||0)+1));BK_INV.unshift([(l&&l.customer)||"Customer",number,"$"+total.toLocaleString(),"today","Open"]);toast("Invoice "+number+" created for "+id+" - $"+total.toLocaleString());wzConfetti();if(l){l.status="completed";}if(WZ.sb){try{const r=await WZ.sb.from("invoices").insert({number,load_id:id,total,status:"sent"}).select().single();if(r.data&&lines.length)await WZ.sb.from("invoice_lines").insert(lines.map(x=>({invoice_id:r.data.id,label:x[0],amount:x[1]})));await wzUpsertLoad(l);}catch(e){toast("Saved locally - DB: "+(e.message||e));}}render();}
 window.invSel=invSel;window.invAddAcc=invAddAcc;window.invCreate=invCreate;
 function mAutoInvoice(){
   const bill=LOADS.filter(l=>["completed","dispatched","enroute"].includes(l.status));
@@ -2378,7 +2409,7 @@ function mCOA(){const cols=BK_COA.map(g=>`<div class="wz-card"><div class="wz-ca
 /* ================= WAYZ BOOKS — Payments + Statements ================= */
 function bkParse(x){return Number(String(x).replace(/[^0-9.]/g,""))||0;}
 function payState(){if(!state.pay)state.pay={ledger:[]};return state.pay;}
-async function payApply(num){const inv=BK_INV.find(i=>i[1]===num);if(!inv)return;if(inv[4]==="Paid"){toast(num+" already paid");return;}inv[4]="Paid";payState().ledger.unshift({num:num,customer:inv[0],amount:inv[2],date:"today"});toast("Payment applied to "+num+" ("+inv[2]+")");if(WZ.sb){try{await WZ.sb.from("invoices").update({status:"paid"}).eq("number",num);}catch(e){}}render();}
+async function payApply(num){const inv=BK_INV.find(i=>i[1]===num);if(!inv)return;if(inv[4]==="Paid"){toast(num+" already paid");return;}inv[4]="Paid";payState().ledger.unshift({num:num,customer:inv[0],amount:inv[2],date:"today"});toast("Payment applied to "+num+" ("+inv[2]+")");wzConfetti();if(WZ.sb){try{await WZ.sb.from("invoices").update({status:"paid"}).eq("number",num);}catch(e){}}render();}
 window.payApply=payApply;
 function mPayments(){
   const open=BK_INV.filter(i=>i[4]==="Open");const paid=BK_INV.filter(i=>i[4]==="Paid");const led=payState().ledger;
@@ -2497,7 +2528,17 @@ function render(){
   c.innerHTML=sub+map[state.active]();
   drawIcons();
   startTickers();
+  try{wzPostRender();}catch(e){}
 }
+
+/* ===== live UI polish ===== */
+var wzLastActive=null;
+function wzCountUp(){try{document.querySelectorAll(".wz-kpi-val").forEach(function(el){var txt=el.textContent||"";var m=txt.match(/^(\D*)(-?[\d,]*\.?\d+)(.*)$/);if(!m)return;var pre=m[1],numStr=m[2],suf=m[3];var target=parseFloat(numStr.replace(/,/g,""));if(isNaN(target))return;var dec=(numStr.split(".")[1]||"").length;var dur=520,start=performance.now();function fmt(v){var s=dec?v.toFixed(dec):Math.round(v).toLocaleString();return pre+s+suf;}function step(now){var t=Math.min(1,(now-start)/dur);var e=1-Math.pow(1-t,3);el.textContent=fmt(target*e);if(t<1)requestAnimationFrame(step);else el.textContent=pre+numStr+suf;}requestAnimationFrame(step);});}catch(e){}}
+function wzClock(){try{var el=document.getElementById("wzClock");if(el){var d=new Date();el.textContent=d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})+" \u00b7 "+d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});}var c=document.getElementById("wzConn");if(c){var on=(typeof WZ!=="undefined"&&WZ.connected);c.className=on?"wz-live":"wz-off";c.title=on?"Database live":"Not connected";}}catch(e){}}
+function wzPostRender(){if(state.active!==wzLastActive){wzLastActive=state.active;wzCountUp();}wzClock();}
+function wzConfetti(){try{var colors=["#38bdf8","#6366f1","#34d399","#f59e0b","#f43f5e"];for(var i=0;i<28;i++){(function(i){var d=document.createElement("div");d.className="wz-confetti";d.style.left=(Math.random()*100)+"vw";d.style.background=colors[i%colors.length];d.style.animationDuration=(1.6+Math.random()*1.2)+"s";d.style.animationDelay=(Math.random()*0.25)+"s";document.body.appendChild(d);setTimeout(function(){d.remove();},3400);})(i);}}catch(e){}}
+window.wzConfetti=wzConfetti;
+if(typeof setInterval==="function"){try{wzClock();setInterval(wzClock,1000);}catch(e){}}
 
 /* ================= LIVE DATA LAYER (Supabase) + CREATE FORMS ================= */
 const WZ={sb:null,connected:false,url:"",key:""};
@@ -2587,7 +2628,7 @@ async function submitLoad(){
   const rec={id,container,ssl:val("wzl_ssl"),terminal:val("wzl_terminal"),routing:val("wzl_routing"),type:val("wzl_type"),size:val("wzl_size"),customer_name:val("wzl_customer"),consignee:val("wzl_consignee"),lfd:val("wzl_lfd")||null,status:"available",charges:{base:base,fuel:Math.round(base*0.32)},holds:[]};
   LOADS.unshift(wzMapLoad(rec));
   if(WZ.sb){try{const r=await WZ.sb.from("loads").insert(rec);if(r.error)throw r.error;}catch(e){toast("Created locally · DB error: "+(e.message||e));}}
-  wzClose();toast("Load created: "+id);setActive("dispatch");
+  wzClose();toast("Load created: "+id);wzConfetti();setActive("dispatch");
 }
 window.openCreateLoad=openCreateLoad;window.submitLoad=submitLoad;
 
