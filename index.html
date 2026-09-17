@@ -681,11 +681,19 @@ function openLoad(id){
     <div class="flex gap-2 border-t border-slate-200 px-6 py-3">
       <button onclick="openAssign('${l.id}')" class="flex-1 rounded-lg bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-800">Dispatch driver</button>
       <button onclick="closeLoad();invCreate('${l.id}')" class="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Send to billing</button>
+      <button onclick="deleteLoad('${l.id}')" title="Delete load" class="rounded-lg border border-red-200 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
     </div>
   </div>`;
   drawIcons();
 }
 function closeLoad(){const el=document.getElementById("slideover");el.className="hidden";el.innerHTML="";}
+function deleteLoad(id){
+  if(!confirm("Delete load "+id+"? This cannot be undone."))return;
+  const i=LOADS.findIndex(x=>x.id===id);if(i>=0)LOADS.splice(i,1);
+  if(WZ.sb){try{WZ.sb.from("loads").delete().eq("id",id);}catch(e){}}
+  closeLoad();toast("Load "+id+" deleted");render();
+}
+window.deleteLoad=deleteLoad;
 window.openLoad=openLoad;window.closeLoad=closeLoad;
 
 function loadCard(l,opts){
