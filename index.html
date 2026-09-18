@@ -340,6 +340,7 @@ const NAV = [
     {key:"driveraiengine",label:"AI Load Matching",icon:"cpu",tag:1},
     {key:"nlreports",label:"Ask Your Data",icon:"message-circle",tag:1},
     {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
+    {key:"approvals",label:"Ava Approvals",icon:"check-check"},
   ]},
   {section:"Wayz Books",items:[
     {key:"books",label:"Dashboard",icon:"book-open"},
@@ -658,6 +659,7 @@ function openLoad(id){
           <div><label class="mb-1 block text-xs text-slate-500">Delivery date / time</label><input id="ol_dappt" type="datetime-local" value="${toLocalDT(l.deliveryAppt)}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"/></div>
         </div>
         <button onclick="saveAppts('${l.id}')" class="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Save appointments</button>
+        <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">${l.schedStatus==="to_send"?'<div class="text-xs text-slate-500">Queued — Ava will email the customer options shortly.</div>':l.schedStatus==="requested"?'<div class="text-xs text-slate-500">Ava emailed the customer — awaiting their reply.</div>':(l.schedStatus==="needs_approval"||l.schedStatus==="reschedule_requested")?`<div class="text-xs text-amber-700">Customer proposed <span class="font-medium">${fmtAppt(l.proposedSlot)}</span> — needs your approval. <button onclick="closeLoad();setActive('approvals')" class="font-medium underline">Review</button></div>`:l.schedStatus==="confirmed"?'<div class="text-xs text-emerald-600">Appointment confirmed with the customer.</div>':`<button onclick="openScheduleReq('${l.id}')" class="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"><i data-lucide="sparkles" class="h-3.5 w-3.5"></i> Have Ava request appointment</button>`}</div>
       </div>
       <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Routing</h3>
         <div class="flex flex-wrap gap-2">${ROUTING.map(r=>`<button onclick="setRouting('${l.id}','${r}')" class="rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 transition ${l.routing===r?'bg-slate-900 text-white ring-slate-900':'bg-white text-slate-600 ring-slate-200 hover:ring-sky-400'}">${r}</button>`).join("")}</div>
@@ -2521,6 +2523,32 @@ function mAvaMemory(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="sparkles" class="h-4 w-4"></i> Teach Ava \u2014 plain-English rules she applies whenever she reads an order (customers, terminals, formats).</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Ava\u2019s rulebook",list)}</div>${teach}</div></div>`;
 }
 
+/* ================= AVA SCHEDULING (human-initiated + approvals) ================= */
+function openScheduleReq(id){
+  const l=LOADS.find(x=>x.id===id);if(!l)return;
+  wzModal(`<div class="border-b border-slate-100 px-5 py-4"><div class="text-base font-semibold text-slate-900">Ask customer for appointment</div><div class="text-xs text-slate-500">${l.customer||''} \u00b7 ${l.container||''}</div></div>
+  <div class="p-5"><div class="mb-2 text-xs font-medium text-slate-500">Offer these delivery slots \u2014 Ava emails the customer to pick one:</div>
+  <div class="space-y-2">${[1,2,3].map(i=>`<input id="sc_${i}" type="datetime-local" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"/>`).join("")}</div>
+  <div class="mt-2 text-[11px] text-slate-400">Up to 3 options. Ava auto-confirms if the customer picks one; if they ask for a different time or a reschedule, she brings it to you for approval.</div></div>
+  <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">Cancel</button><button onclick="submitScheduleReq('${id}')" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Have Ava ask</button></div>`);
+}
+function submitScheduleReq(id){
+  const l=LOADS.find(x=>x.id===id);if(!l)return;
+  const slots=[1,2,3].map(i=>val("sc_"+i)).filter(Boolean);
+  if(!slots.length){toast("Pick at least one slot");return;}
+  l.offeredSlots=slots;l.schedStatus="to_send";l.proposedSlot=null;
+  wzUpsertLoad(l);wzClose();toast("Ava will email "+(l.customer||"the customer")+" with these options");render();
+}
+function approveAppt(id){const l=LOADS.find(x=>x.id===id);if(!l)return;if(l.proposedSlot){l.deliveryAppt=l.proposedSlot;l.appt=l.proposedSlot;}l.schedStatus="approved";wzUpsertLoad(l);toast("Approved \u2014 Ava will confirm with the customer");render();}
+function rejectAppt(id){const l=LOADS.find(x=>x.id===id);if(!l)return;l.schedStatus="rejected";wzUpsertLoad(l);toast("Rejected \u2014 Ava will offer other times");render();}
+window.openScheduleReq=openScheduleReq;window.submitScheduleReq=submitScheduleReq;window.approveAppt=approveAppt;window.rejectAppt=rejectAppt;
+function mApprovals(){
+  const q=LOADS.filter(function(l){return l.schedStatus==="needs_approval"||l.schedStatus==="reschedule_requested";});
+  const rows=q.length?q.map(function(l){return `<div class="border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-center justify-between"><div><div class="text-sm font-medium text-slate-800">${l.id} \u00b7 ${l.container||''}</div><div class="text-[11px] text-slate-500">${l.customer||''} \u00b7 ${l.consignee||''}</div></div><span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">${l.schedStatus==="reschedule_requested"?"reschedule":"off-menu time"}</span></div><div class="mt-2 flex items-center justify-between gap-3"><div class="text-sm text-slate-700">Customer wants: <span class="font-medium">${fmtAppt(l.proposedSlot)}</span></div><div class="flex gap-2"><button onclick="approveAppt('${l.id}')" class="rounded-md bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white">Approve</button><button onclick="rejectAppt('${l.id}')" class="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Reject</button></div></div></div>`;}).join(""):'<div class="p-8 text-center text-sm text-slate-400">Nothing needs approval right now.</div>';
+  const k=kpis([["Awaiting approval",String(q.length),q.length?"text-amber-600":"text-emerald-600"],["Agent","Ava"],["On-menu picks","auto-confirmed"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="check-check" class="h-4 w-4"></i> Ava escalates appointment requests that weren\u2019t one of your offered slots \u2014 approve or reject and she replies to the customer.</div>${k}${panel("Appointment approvals",rows)}</div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2562,7 +2590,7 @@ function render(){
     /* v2 — Insights */
     execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
     /* v2 — AI */
-    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,
+    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
     books:mBooks,payments:mPayments,statements:mStatements,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
@@ -2602,7 +2630,7 @@ function openInviteUser(){wzModal(`<div class="border-b border-slate-100 px-5 py
 function submitInvite(){const email=val("wzu_email");if(!email){toast("Email is required");return;}const rm={"Owner / Admin":"owner","Dispatcher":"dispatch","Billing / AR":"billing","Safety & Compliance":"safety","Read-only":"readonly"};USERS.push({name:val("wzu_name")||email,email:email,role:rm[val("wzu_role")]||"readonly",status:"Invited",last:"pending"});wzClose();toast("Invite sent to "+email);setActive("roles");}
 window.openInviteUser=openInviteUser;window.submitInvite=submitInvite;
 
-function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
+function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",schedStatus:r.sched_status||"",offeredSlots:r.offered_slots||[],proposedSlot:r.proposed_slot||null,consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
 async function wzLoad(){
   if(!WZ.sb)return;
   try{const d=await WZ.sb.from("drivers").select("*");if(!d.error){DRIVERS.length=0;(d.data||[]).forEach(r=>DRIVERS.push({name:r.name,truck:r.truck||"—",status:r.status||"Available",loads:0,phone:r.phone||"—",hos:(r.hos==null?11:r.hos),chassis:r.chassis||"",kind:r.kind||"company",_id:r.id}));}}catch(e){}
@@ -2613,7 +2641,7 @@ function toLocalDT(s){if(!s)return"";s=String(s).replace(" ","T");var m=s.match(
 function fmtAppt(s){if(!s)return"—";try{var d=new Date(String(s).replace(" ","T"));if(isNaN(d))return s;return d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}catch(e){return s;}}
 function saveAppts(id){var l=LOADS.find(function(x){return x.id===id;});if(!l)return;l.pickupAppt=val("ol_pappt");l.deliveryAppt=val("ol_dappt");l.appt=l.pickupAppt||l.appt;wzUpsertLoad(l);toast("Appointments saved for "+id);openLoad(id);render();}
 window.saveAppts=saveAppts;
-async function wzUpsertLoad(l){if(!WZ.sb||!l)return;try{await WZ.sb.from("loads").upsert({id:l.id,container:l.container,mbl:l.mbl,ssl:l.ssl,size:l.size,routing:l.routing,type:l.type,status:l.status,terminal:l.terminal,lfd:(/\d{4}-\d{2}-\d{2}/.test(l.lfd)?l.lfd:null),pickup_appt:l.pickupAppt||null,delivery_appt:l.deliveryAppt||null,appt:l.appt||null,consignee:l.consignee,customer_name:l.customer,driver_name:l.driver,holds:l.holds||[],charges:l.charges||{}});}catch(e){}}
+async function wzUpsertLoad(l){if(!WZ.sb||!l)return;try{await WZ.sb.from("loads").upsert({id:l.id,container:l.container,mbl:l.mbl,ssl:l.ssl,size:l.size,routing:l.routing,type:l.type,status:l.status,terminal:l.terminal,lfd:(/\d{4}-\d{2}-\d{2}/.test(l.lfd)?l.lfd:null),pickup_appt:l.pickupAppt||null,delivery_appt:l.deliveryAppt||null,appt:l.appt||null,sched_status:l.schedStatus||null,offered_slots:l.offeredSlots||null,proposed_slot:l.proposedSlot||null,consignee:l.consignee,customer_name:l.customer,driver_name:l.driver,holds:l.holds||[],charges:l.charges||{}});}catch(e){}}
 window.wzUpsertLoad=wzUpsertLoad;
 
 async function wzConnect(url,key,silent){
