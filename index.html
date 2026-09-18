@@ -339,6 +339,7 @@ const NAV = [
     {key:"demurrageai",label:"Demurrage Predictor",icon:"sparkles",tag:1},
     {key:"driveraiengine",label:"AI Load Matching",icon:"cpu",tag:1},
     {key:"nlreports",label:"Ask Your Data",icon:"message-circle",tag:1},
+    {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
   ]},
   {section:"Wayz Books",items:[
     {key:"books",label:"Dashboard",icon:"book-open"},
@@ -2500,6 +2501,26 @@ function mAging(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="calendar-clock" class="h-4 w-4"></i> A/R and A/P aging - who owes you, and who you owe, by age.</div>${k}<div class="space-y-4">${panel("Accounts receivable aging",agingTable(ar))}${panel("Accounts payable aging",agingTable(ap))}</div></div>`;
 }
 
+/* ================= AVA'S MEMORY (teach the AI) ================= */
+function avaState(){if(!state.ava)state.ava={notes:null,loaded:false};return state.ava;}
+async function avaLoad(){const s=avaState();if(!WZ.sb){s.notes=[];s.loaded=true;return;}try{const r=await WZ.sb.from("ai_memory").select("*").order("created_at",{ascending:true});s.notes=r.data||[];}catch(e){s.notes=[];}s.loaded=true;if(state.active==="avamemory")render();}
+async function avaAdd(){const v=val("ava_new");if(!v){toast("Type a rule first");return;}const s=avaState();s.notes=s.notes||[];if(WZ.sb){try{const r=await WZ.sb.from("ai_memory").insert({note:v}).select().single();if(r.error)throw r.error;s.notes.push(r.data||{note:v});}catch(e){toast("DB error: "+(e.message||e));return;}}else{s.notes.push({note:v});}toast("Ava learned it");render();}
+async function avaDelete(id){if(WZ.sb&&id){try{await WZ.sb.from("ai_memory").delete().eq("id",id);}catch(e){}}const s=avaState();s.notes=(s.notes||[]).filter(function(n){return n.id!==id;});toast("Rule removed");render();}
+window.avaAdd=avaAdd;window.avaDelete=avaDelete;
+function mAvaMemory(){
+  const s=avaState();
+  if(WZ.sb&&!s.loaded)avaLoad();
+  const notes=s.notes||[];
+  let list;
+  if(!WZ.sb)list='<div class="p-6 text-center text-sm text-slate-400">Connect the database (Settings \u2192 Data & API) to manage Ava\u2019s memory.</div>';
+  else if(!s.loaded)list='<div class="p-6 text-center text-sm text-slate-400">Loading\u2026</div>';
+  else if(!notes.length)list='<div class="p-6 text-center text-sm text-slate-400">No rules yet \u2014 teach Ava on the right.</div>';
+  else list='<div>'+notes.map(function(n){return `<div class="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-start gap-2 text-sm text-slate-700"><i data-lucide="sparkles" class="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-500"></i><span>${(n.note||"").replace(/</g,"&lt;")}</span></div>${n.id?`<button onclick="avaDelete('${n.id}')" class="flex-shrink-0 text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="h-4 w-4"></i></button>`:''}</div>`;}).join("")+'</div>';
+  const k=kpis([["Rules taught",String(notes.length)],["Agent","Ava"],["Applies to","Every order she reads"]]);
+  const teach=`<div class="wz-card"><div class="wz-card-head">Teach Ava</div><div class="p-4"><textarea id="ava_new" rows="4" placeholder="e.g. Emails from @brsglobal are customer BRS Global Logistics" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"></textarea><button onclick="avaAdd()" class="wz-btn-brand mt-2 w-full rounded-lg py-2 text-sm font-semibold">Teach Ava this rule</button><div class="mt-2 text-[11px] leading-relaxed text-slate-400">Examples: which company is the customer for a sender, what a terminal name maps to, or how a specific customer formats their orders.</div></div></div>`;
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="sparkles" class="h-4 w-4"></i> Teach Ava \u2014 plain-English rules she applies whenever she reads an order (customers, terminals, formats).</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Ava\u2019s rulebook",list)}</div>${teach}</div></div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2541,7 +2562,7 @@ function render(){
     /* v2 — Insights */
     execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
     /* v2 — AI */
-    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,
+    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
     books:mBooks,payments:mPayments,statements:mStatements,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
