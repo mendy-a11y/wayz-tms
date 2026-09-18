@@ -384,6 +384,7 @@ const STATUS = {
   enroute:{label:"En route",dot:"bg-indigo-500",pill:"bg-indigo-50 text-indigo-700 ring-indigo-200"},
   hold:{label:"On hold",dot:"bg-red-500",pill:"bg-red-50 text-red-700 ring-red-200"},
   completed:{label:"Completed",dot:"bg-emerald-500",pill:"bg-emerald-50 text-emerald-700 ring-emerald-200"},
+  delivered:{label:"Delivered",dot:"bg-emerald-500",pill:"bg-emerald-50 text-emerald-700 ring-emerald-200"},
 };
 const TYPE = {IMP:"bg-sky-50 text-sky-700 ring-sky-200",EXP:"bg-amber-50 text-amber-700 ring-amber-200",Empty:"bg-slate-50 text-slate-600 ring-slate-200"};
 const ROUTING = ["1 Way","Drop and Hook","Live","Prepull-Live","Prepull drop"];
@@ -410,7 +411,7 @@ function buildLegs(l,r){
 function setRouting(id,r){const l=LOADS.find(x=>x.id===id);l.routing=r;l.legs=buildLegs(l,r);openLoad(id);}
 window.setRouting=setRouting;
 
-function pill(s){const m=STATUS[s];return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${m.pill}"><span class="h-1.5 w-1.5 rounded-full ${m.dot}"></span>${m.label}</span>`;}
+function pill(s){const m=STATUS[s]||STATUS.available;return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${m.pill}"><span class="h-1.5 w-1.5 rounded-full ${m.dot}"></span>${m.label}</span>`;}
 function typeBadge(t){return `<span class="rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${TYPE[t]}">${t}</span>`;}
 function lfdMeta(lfd){
   if(!lfd||lfd==="—")return{txt:"—",cls:"text-slate-400"};
@@ -684,7 +685,7 @@ function openLoad(id){
       </div>
     </div>
     <div class="flex gap-2 border-t border-slate-200 px-6 py-3">
-      <button onclick="openAssign('${l.id}')" class="flex-1 rounded-lg bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-800">Dispatch driver</button>
+      ${(l.status==="delivered"||l.status==="completed")?'<div class="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 py-2.5 text-sm font-medium text-emerald-700"><i data-lucide="check-circle" class="h-4 w-4"></i> Delivered</div>':`<button onclick="openAssign('${l.id}')" class="flex-1 rounded-lg bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-800">Dispatch driver</button><button onclick="markDelivered('${l.id}')" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100">Mark delivered</button>`}
       <button onclick="closeLoad();invCreate('${l.id}')" class="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Send to billing</button>
       <button onclick="deleteLoad('${l.id}')" title="Delete load" class="rounded-lg border border-red-200 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
     </div>
@@ -698,6 +699,8 @@ function deleteLoad(id){
   if(WZ.sb){try{WZ.sb.from("loads").delete().eq("id",id);}catch(e){}}
   closeLoad();toast("Load "+id+" deleted");render();
 }
+function markDelivered(id){const l=LOADS.find(x=>x.id===id);if(!l)return;l.status="delivered";if(WZ.sb)wzUpsertLoad(l);closeLoad();toast("Load "+id+" marked delivered \u2014 Penny will draft the invoice");render();}
+window.markDelivered=markDelivered;
 window.deleteLoad=deleteLoad;
 window.openLoad=openLoad;window.closeLoad=closeLoad;
 
