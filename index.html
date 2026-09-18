@@ -2716,7 +2716,7 @@ function loadDetails(l){
   const txtInp=function(id,label,v){return `<div><label class="mb-1 block text-[11px] text-slate-500">${label}</label><input id="md_${id}" value="${String(v||"").replace(/"/g,'&quot;')}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div>`;};
   const flagBox=function(key,label){return `<label class="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" id="flag_${key}" ${f[key]?"checked":""}/> ${label}</label>`;};
   return `<div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Dates</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${DATE_FIELDS.map(function(x){return dateInp(x[0],x[1]);}).join("")}</div></div>
-  <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Equipment & references</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${txtInp("size","Size",l.size)}${txtInp("type","Type",l.type)}${txtInp("ssl","SSL",l.ssl)}${txtInp("chassis","Chassis #",m.chassis)}${txtInp("weight","Weight",m.weight)}${txtInp("mbl","MBL #",l.mbl)}${txtInp("houseBol","House BOL",m.houseBol)}${txtInp("ref","Reference #",m.ref)}</div>
+  <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Equipment & references</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${txtInp("size","Size",l.size)}${txtInp("type","Container type",m.containerType)}${txtInp("ssl","SSL",l.ssl)}${txtInp("chassis","Chassis #",m.chassis)}${txtInp("weight","Weight",m.weight)}${txtInp("commodity","Commodity",m.commodity)}${txtInp("mbl","MBL #",l.mbl)}${txtInp("houseBol","House BOL",m.houseBol)}${txtInp("ref","Reference #",m.ref)}</div>
   <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">${FLAG_OPTS.map(function(x){return flagBox(x[0],x[1]);}).join("")}</div>
   <button onclick="saveLoadMeta('${l.id}')" class="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Save load details</button></div>`;
 }
@@ -2724,7 +2724,7 @@ function saveLoadMeta(id){
   const l=LOADS.find(function(x){return x.id===id;});if(!l)return;
   l.meta=l.meta||{};l.meta.dates=l.meta.dates||{};l.meta.flags=l.meta.flags||{};
   DATE_FIELDS.forEach(function(d){const v=val("md_"+d[0]);if(d[0]==="lfd"){l.lfd=v;}else{l.meta.dates[d[0]]=v;}});
-  l.size=val("md_size");l.type=val("md_type");l.ssl=val("md_ssl");l.mbl=val("md_mbl");
+  l.size=val("md_size");l.meta.containerType=val("md_type");l.ssl=val("md_ssl");l.mbl=val("md_mbl");l.meta.commodity=val("md_commodity");
   l.meta.chassis=val("md_chassis");l.meta.weight=val("md_weight");l.meta.houseBol=val("md_houseBol");l.meta.ref=val("md_ref");
   FLAG_OPTS.forEach(function(x){const el=document.getElementById("flag_"+x[0]);l.meta.flags[x[0]]=!!(el&&el.checked);});
   if(WZ.sb)wzUpsertLoad(l);toast("Load details saved");openLoad(id);render();
