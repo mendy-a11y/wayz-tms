@@ -305,6 +305,7 @@ const NAV = [
   {section:"Customer",items:[
     {key:"customers",label:"Customer Portal",icon:"building-2"},
     {key:"contractrates",label:"Customer Rates",icon:"file-text"},
+    {key:"ratecards",label:"Rate Cards",icon:"upload"},
     {key:"quoteconvert",label:"Quote Conversion",icon:"trending-up"},
     {key:"credithold",label:"Credit Holds",icon:"lock"},
     {key:"custapp",label:"Customer App",icon:"smartphone"},
@@ -2639,6 +2640,39 @@ function suggestAccessorials(id){
 function applySuggestions(){const s=state._sug;if(!s)return;const l=LOADS.find(function(x){return x.id===s.id;});if(!l){wzClose();return;}l.charges=l.charges||{};l.charges.items=l.charges.items||[];let n=0;s.list.forEach(function(it,i){const cb=document.getElementById("sug_"+i);if(cb&&cb.checked){l.charges.items.push({label:it.label,amount:it.amount});n++;}});if(WZ.sb)wzUpsertLoad(l);wzClose();toast(n+" accessorial"+(n!==1?"s":"")+" added");openLoad(s.id);render();}
 window.suggestAccessorials=suggestAccessorials;window.applySuggestions=applySuggestions;
 
+/* ================= CUSTOMER RATE CARDS (upload -> Ava reads -> Penny bills) ================= */
+function rcState(){if(!state.rc)state.rc={list:null,loaded:false};return state.rc;}
+async function rcLoad(){const s=rcState();if(!WZ.sb){s.list=[];s.loaded=true;return;}try{const r=await WZ.sb.from("rate_cons").select("*").order("created_at",{ascending:false});s.list=r.data||[];}catch(e){s.list=[];}s.loaded=true;if(state.active==="ratecards")render();}
+async function rcUpload(){
+  const cust=val("rc_up_customer");const fileEl=document.getElementById("rc_file");const file=fileEl&&fileEl.files&&fileEl.files[0];
+  if(!file){toast("Choose a PDF first");return;}
+  if(!WZ.sb){toast("Connect the database first (Settings)");return;}
+  const path=(cust||"unknown").replace(/[^A-Za-z0-9]/g,"_")+"/"+Date.now()+"_"+file.name.replace(/[^A-Za-z0-9._-]/g,"_");
+  toast("Uploading\u2026");
+  try{
+    const up=await WZ.sb.storage.from("rate-cons").upload(path,file,{contentType:file.type||"application/pdf",upsert:true});
+    if(up.error)throw up.error;
+    const pub=WZ.sb.storage.from("rate-cons").getPublicUrl(path);
+    const url=pub&&pub.data?pub.data.publicUrl:"";
+    const ins=await WZ.sb.from("rate_cons").insert({customer:cust||null,storage_path:path,url:url,status:"to_parse"});
+    if(ins.error)throw ins.error;
+    toast("Uploaded \u2014 Ava will read it within a few minutes");
+    rcState().loaded=false;render();
+  }catch(e){toast("Upload failed: "+(e.message||e));}
+}
+window.rcUpload=rcUpload;
+function mRateCards(){
+  const s=rcState();if(WZ.sb&&!s.loaded)rcLoad();const list=s.list||[];
+  let rows;
+  if(!WZ.sb)rows='<div class="p-6 text-center text-sm text-slate-400">Connect the database (Settings \u2192 Data & API) to upload rate cards.</div>';
+  else if(!s.loaded)rows='<div class="p-6 text-center text-sm text-slate-400">Loading\u2026</div>';
+  else if(!list.length)rows='<div class="p-6 text-center text-sm text-slate-400">No rate cards uploaded yet.</div>';
+  else rows=list.map(function(rc){var badge=rc.status==="parsed"?'<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">read \u2713</span>':rc.status==="failed"?'<span class="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200">failed</span>':'<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">reading\u2026</span>';return `<div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 last:border-0"><div><div class="text-sm font-medium text-slate-800">${rc.customer||"(customer from PDF)"}</div><div class="text-[11px] text-slate-400">${(rc.storage_path||"").split("/").pop()}</div></div><div class="flex items-center gap-3">${badge}${rc.url?`<a href="${rc.url}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-600"><i data-lucide="file-text" class="h-4 w-4"></i></a>`:""}</div></div>`;}).join("");
+  const k=kpis([["Rate cards",String(list.length)],["Read by Ava",String(list.filter(function(x){return x.status==="parsed";}).length)],["Feeds","Penny\u2019s invoices"]]);
+  const upload=`<div class="wz-card"><div class="wz-card-head">Upload a rate card</div><div class="space-y-2 p-4"><input id="rc_up_customer" placeholder="Customer (e.g. Aspire)" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400"/><input id="rc_file" type="file" accept="application/pdf" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><button onclick="rcUpload()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Upload \u2014 Ava reads it</button><div class="text-[11px] leading-relaxed text-slate-400">Ava extracts the rate breakdown (linehaul, chassis, prepull, detention, free time, tolls\u2026) and saves it as this customer\u2019s billing rules. Penny then bills from it automatically.</div></div></div>`;
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="file-text" class="h-4 w-4"></i> Upload each customer\u2019s drayage rate quotation \u2014 Ava reads it, Penny bills from it.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Uploaded rate cards",rows)}</div>${upload}</div></div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2658,7 +2692,7 @@ function render(){
     scorecards:mScorecards,
     arap:mARAP,accessorials:mAccessorials,invoicing:mInvoicing,autoinvoice:mAutoInvoice,perdiem:mPerdiem,
     vendorbills:mVendorBills,ezpass:mEzpass,
-    customers:mCustomers,
+    customers:mCustomers,ratecards:mRateCards,
     quotes:mQuotes,
     notifications:mNotifications,
     ocean:mOcean,holds:mHolds,
