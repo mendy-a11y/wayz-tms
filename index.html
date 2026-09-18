@@ -349,6 +349,8 @@ const NAV = [
     {key:"arbooks",label:"Invoices (A/R)",icon:"file-text"},
     {key:"payments",label:"Payments",icon:"banknote"},
     {key:"statements",label:"Statements",icon:"mail"},
+    {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
+    {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
     {key:"autoinvoice",label:"Auto-Invoicing",icon:"file-check-2"},
     {key:"batchinvoice",label:"Batch Invoicing",icon:"files"},
     {key:"apbills",label:"Bills (A/P)",icon:"file-input"},
@@ -2549,6 +2551,44 @@ function mApprovals(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="check-check" class="h-4 w-4"></i> Ava escalates appointment requests that weren\u2019t one of your offered slots \u2014 approve or reject and she replies to the customer.</div>${k}${panel("Appointment approvals",rows)}</div>`;
 }
 
+/* ================= PENNY — billing agent (memory + approvals) ================= */
+function fmtMoney(n){n=Number(n)||0;return "$"+Math.round(n).toLocaleString();}
+/* --- Penny's memory --- */
+function pennyMemState(){if(!state.pmem)state.pmem={notes:null,loaded:false};return state.pmem;}
+async function pennyMemLoad(){const s=pennyMemState();if(!WZ.sb){s.notes=[];s.loaded=true;return;}try{const r=await WZ.sb.from("penny_memory").select("*").order("created_at",{ascending:true});s.notes=r.data||[];}catch(e){s.notes=[];}s.loaded=true;if(state.active==="pennymemory")render();}
+async function pennyAdd(){const v=val("penny_new");if(!v){toast("Type a rule first");return;}const s=pennyMemState();s.notes=s.notes||[];if(WZ.sb){try{const r=await WZ.sb.from("penny_memory").insert({note:v}).select().single();if(r.error)throw r.error;s.notes.push(r.data||{note:v});}catch(e){toast("DB error: "+(e.message||e));return;}}else{s.notes.push({note:v});}toast("Penny learned it");render();}
+async function pennyDel(id){if(WZ.sb&&id){try{await WZ.sb.from("penny_memory").delete().eq("id",id);}catch(e){}}const s=pennyMemState();s.notes=(s.notes||[]).filter(function(n){return n.id!==id;});toast("Rule removed");render();}
+window.pennyAdd=pennyAdd;window.pennyDel=pennyDel;
+function mPennyMemory(){
+  const s=pennyMemState();if(WZ.sb&&!s.loaded)pennyMemLoad();const notes=s.notes||[];
+  let list;
+  if(!WZ.sb)list='<div class="p-6 text-center text-sm text-slate-400">Connect the database (Settings \u2192 Data & API) to manage Penny\u2019s memory.</div>';
+  else if(!s.loaded)list='<div class="p-6 text-center text-sm text-slate-400">Loading\u2026</div>';
+  else if(!notes.length)list='<div class="p-6 text-center text-sm text-slate-400">No rules yet \u2014 teach Penny on the right.</div>';
+  else list='<div>'+notes.map(function(n){return `<div class="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-start gap-2 text-sm text-slate-700"><i data-lucide="receipt" class="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500"></i><span>${(n.note||"").replace(/</g,"&lt;")}</span></div>${n.id?`<button onclick="pennyDel('${n.id}')" class="flex-shrink-0 text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="h-4 w-4"></i></button>`:''}</div>`;}).join("")+'</div>';
+  const k=kpis([["Rules taught",String(notes.length)],["Agent","Penny"],["Applies to","Invoices & reminders"]]);
+  const teach=`<div class="wz-card"><div class="wz-card-head">Teach Penny</div><div class="p-4"><textarea id="penny_new" rows="4" placeholder="e.g. BRS Global is Net 45; always CC ap@brsglobal.com" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"></textarea><button onclick="pennyAdd()" class="wz-btn-brand mt-2 w-full rounded-lg py-2 text-sm font-semibold">Teach Penny this rule</button><div class="mt-2 text-[11px] leading-relaxed text-slate-400">Examples: payment terms per customer, who to CC, remit-to notes, or how to word reminders.</div></div></div>`;
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="receipt" class="h-4 w-4"></i> Teach Penny \u2014 billing rules she applies to invoices and payment reminders.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Penny\u2019s rulebook",list)}</div>${teach}</div></div>`;
+}
+/* --- Penny's Desk (approvals) --- */
+function pennyState(){if(!state.penny)state.penny={inv:null,loaded:false};return state.penny;}
+async function pennyLoad(){const s=pennyState();if(!WZ.sb){s.inv=[];s.loaded=true;return;}try{const r=await WZ.sb.from("invoices").select("*").order("created_at",{ascending:false});s.inv=r.data||[];}catch(e){s.inv=[];}s.loaded=true;if(state.active==="pennydesk")render();}
+async function invApprove(id){if(WZ.sb){try{await WZ.sb.from("invoices").update({status:"approved"}).eq("id",id);}catch(e){}}(pennyState().inv||[]).forEach(function(i){if(i.id===id)i.status="approved";});toast("Invoice approved \u2014 Penny will send it");render();}
+async function invReject(id){if(WZ.sb){try{await WZ.sb.from("invoices").update({status:"void"}).eq("id",id);}catch(e){}}const s=pennyState();s.inv=(s.inv||[]).filter(function(i){return i.id!==id;});toast("Invoice voided");render();}
+async function remApprove(id){if(WZ.sb){try{await WZ.sb.from("invoices").update({reminder_status:"approved"}).eq("id",id);}catch(e){}}(pennyState().inv||[]).forEach(function(i){if(i.id===id)i.reminder_status="approved";});toast("Reminder approved \u2014 Penny will send it");render();}
+async function remSkip(id){if(WZ.sb){try{await WZ.sb.from("invoices").update({reminder_status:"skip"}).eq("id",id);}catch(e){}}(pennyState().inv||[]).forEach(function(i){if(i.id===id)i.reminder_status="skip";});toast("Reminder skipped");render();}
+window.invApprove=invApprove;window.invReject=invReject;window.remApprove=remApprove;window.remSkip=remSkip;
+function mPennyDesk(){
+  const s=pennyState();if(WZ.sb&&!s.loaded)pennyLoad();const inv=s.inv||[];
+  const drafts=inv.filter(function(i){return i.status==="draft";});
+  const rems=inv.filter(function(i){return i.reminder_status==="draft";});
+  const draftRows=drafts.length?drafts.map(function(i){return `<div class="border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-center justify-between"><div><div class="text-sm font-medium text-slate-800">${i.number||i.id} \u00b7 ${fmtMoney(i.total)}</div><div class="text-[11px] text-slate-500">Load ${i.load_id||""}</div></div><div class="flex gap-2"><button onclick="invApprove('${i.id}')" class="rounded-md bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white">Approve & send</button><button onclick="invReject('${i.id}')" class="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Void</button></div></div></div>`;}).join(""):'<div class="p-6 text-center text-xs text-slate-400">No invoices awaiting approval.</div>';
+  const remRows=rems.length?rems.map(function(i){return `<div class="border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-center justify-between"><div><div class="text-sm font-medium text-slate-800">${i.number||i.id} \u00b7 ${fmtMoney(i.total)}</div><div class="text-[11px] text-amber-600">Past due \u2014 reminder drafted</div></div><div class="flex gap-2"><button onclick="remApprove('${i.id}')" class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Approve & send</button><button onclick="remSkip('${i.id}')" class="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Skip</button></div></div></div>`;}).join(""):'<div class="p-6 text-center text-xs text-slate-400">No reminders drafted.</div>';
+  const openAr=inv.filter(function(i){return i.status==="sent";}).reduce(function(a,i){return a+(Number(i.total)||0);},0);
+  const k=kpis([["Invoices to approve",String(drafts.length),drafts.length?"text-amber-600":"text-emerald-600"],["Reminders to approve",String(rems.length),rems.length?"text-amber-600":"text-emerald-600"],["Open A/R (sent)",fmtMoney(openAr)]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="receipt" class="h-4 w-4"></i> Penny drafts invoices on delivery and payment reminders when overdue \u2014 you approve, she sends.</div>${k}<div class="grid gap-4 xl:grid-cols-2"><div class="wz-card"><div class="wz-card-head">Invoices awaiting approval</div>${draftRows}</div><div class="wz-card"><div class="wz-card-head">Payment reminders awaiting approval</div>${remRows}</div></div></div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2593,7 +2633,7 @@ function render(){
     demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
-    books:mBooks,payments:mPayments,statements:mStatements,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
+    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
     roles:mRoles,
     settings:mSettings,
   };
