@@ -657,6 +657,8 @@ function openLoad(id){
           <div class="flex-1"><div class="text-xs text-slate-500">Holds</div><div class="mt-1">${holdBadges(l.holds)}</div></div>
         </div>
       </div>
+      ${marginBar(l)}
+      ${loadDetails(l)}
       <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Appointments</h3>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="mb-1 block text-xs text-slate-500">Pickup date / time</label><input id="ol_pappt" type="datetime-local" value="${toLocalDT(l.pickupAppt)}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400 focus:bg-white"/></div>
@@ -2699,6 +2701,36 @@ function invPreview(invId){
 function invPrint(){try{var w=window.open("","_blank");if(!w)return;w.document.write('<html><head><title>Invoice</title></head><body style="margin:24px;">'+(state._invPrev||"")+'</body></html>');w.document.close();w.focus();setTimeout(function(){w.print();},300);}catch(e){}}
 window.invPreview=invPreview;window.invPrint=invPrint;
 
+/* ================= PORTPRO-STYLE LOAD DETAIL (margin + dates + equipment) ================= */
+const DATE_FIELDS=[["vesselEta","Vessel ETA"],["lfd","Last Free Day"],["discharge","Discharge Date"],["outgate","Outgate Date"],["empty","Empty Date"],["perdiemFree","Per Diem Free Day"],["ingate","Ingate Date"],["readyReturn","Ready to Return"]];
+const FLAG_OPTS=[["hazmat","Hazmat"],["reefer","Reefer"],["overweight","Overweight"],["overheight","Overheight"],["hot","Hot"],["scale","Scale"],["bonded","Bonded"],["streetturn","Street Turn"],["oog","OOG"],["genset","Genset"],["liquor","Liquor"],["double","Double"],["ev","EV"],["tanker","Tanker"]];
+function marginBar(l){
+  const c=l.charges||{};const base=Number(c.base)||0;const total=accTotal(l);const acc=total-base;
+  const dpay=(typeof loadDriverPay==="function"?(loadDriverPay(l)||0):0);const margin=total-dpay;const pct=total?Math.round(margin/total*100):0;
+  const cell=function(label,v,cls){return `<div class="flex-1 px-3 py-2 text-center"><div class="text-[10px] uppercase tracking-wide text-slate-400">${label}</div><div class="text-sm font-semibold tabular ${cls||'text-slate-800'}">${v}</div></div>`;};
+  return `<div class="mb-4 flex flex-wrap items-stretch divide-x divide-slate-100 rounded-xl border border-slate-200 bg-slate-50/60">${cell("Base",money(base))}${cell("Accessorials",money(acc))}${cell("Total charges",money(total),"text-slate-900")}${cell("Driver pay",money(dpay))}${cell("Load margin",money(margin)+" \u00b7 "+pct+"%",margin>=0?"text-emerald-600":"text-red-600")}</div>`;
+}
+function loadDetails(l){
+  const m=l.meta||{};const dts=m.dates||{};const f=m.flags||{};
+  const dateInp=function(key,label){const v=key==="lfd"?(l.lfd||""):(dts[key]||"");return `<div><label class="mb-1 block text-[11px] text-slate-500">${label}</label><input id="md_${key}" type="date" value="${v}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div>`;};
+  const txtInp=function(id,label,v){return `<div><label class="mb-1 block text-[11px] text-slate-500">${label}</label><input id="md_${id}" value="${String(v||"").replace(/"/g,'&quot;')}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div>`;};
+  const flagBox=function(key,label){return `<label class="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" id="flag_${key}" ${f[key]?"checked":""}/> ${label}</label>`;};
+  return `<div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Dates</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${DATE_FIELDS.map(function(x){return dateInp(x[0],x[1]);}).join("")}</div></div>
+  <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Equipment & references</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${txtInp("size","Size",l.size)}${txtInp("type","Type",l.type)}${txtInp("ssl","SSL",l.ssl)}${txtInp("chassis","Chassis #",m.chassis)}${txtInp("weight","Weight",m.weight)}${txtInp("mbl","MBL #",l.mbl)}${txtInp("houseBol","House BOL",m.houseBol)}${txtInp("ref","Reference #",m.ref)}</div>
+  <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">${FLAG_OPTS.map(function(x){return flagBox(x[0],x[1]);}).join("")}</div>
+  <button onclick="saveLoadMeta('${l.id}')" class="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Save load details</button></div>`;
+}
+function saveLoadMeta(id){
+  const l=LOADS.find(function(x){return x.id===id;});if(!l)return;
+  l.meta=l.meta||{};l.meta.dates=l.meta.dates||{};l.meta.flags=l.meta.flags||{};
+  DATE_FIELDS.forEach(function(d){const v=val("md_"+d[0]);if(d[0]==="lfd"){l.lfd=v;}else{l.meta.dates[d[0]]=v;}});
+  l.size=val("md_size");l.type=val("md_type");l.ssl=val("md_ssl");l.mbl=val("md_mbl");
+  l.meta.chassis=val("md_chassis");l.meta.weight=val("md_weight");l.meta.houseBol=val("md_houseBol");l.meta.ref=val("md_ref");
+  FLAG_OPTS.forEach(function(x){const el=document.getElementById("flag_"+x[0]);l.meta.flags[x[0]]=!!(el&&el.checked);});
+  if(WZ.sb)wzUpsertLoad(l);toast("Load details saved");openLoad(id);render();
+}
+window.saveLoadMeta=saveLoadMeta;
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2780,7 +2812,7 @@ function openInviteUser(){wzModal(`<div class="border-b border-slate-100 px-5 py
 function submitInvite(){const email=val("wzu_email");if(!email){toast("Email is required");return;}const rm={"Owner / Admin":"owner","Dispatcher":"dispatch","Billing / AR":"billing","Safety & Compliance":"safety","Read-only":"readonly"};USERS.push({name:val("wzu_name")||email,email:email,role:rm[val("wzu_role")]||"readonly",status:"Invited",last:"pending"});wzClose();toast("Invite sent to "+email);setActive("roles");}
 window.openInviteUser=openInviteUser;window.submitInvite=submitInvite;
 
-function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",schedStatus:r.sched_status||"",offeredSlots:r.offered_slots||[],proposedSlot:r.proposed_slot||null,consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
+function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",schedStatus:r.sched_status||"",offeredSlots:r.offered_slots||[],proposedSlot:r.proposed_slot||null,meta:r.meta||{},consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
 async function wzLoad(){
   if(!WZ.sb)return;
   try{const d=await WZ.sb.from("drivers").select("*");if(!d.error){DRIVERS.length=0;(d.data||[]).forEach(r=>DRIVERS.push({name:r.name,truck:r.truck||"—",status:r.status||"Available",loads:0,phone:r.phone||"—",hos:(r.hos==null?11:r.hos),chassis:r.chassis||"",kind:r.kind||"company",_id:r.id}));}}catch(e){}
