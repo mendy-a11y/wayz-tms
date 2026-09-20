@@ -561,7 +561,8 @@ window.toggleNav=toggleNav;
 function mDispatch(){
   const isActive=function(l){return l.status!=="delivered"&&l.status!=="completed";};
   const needPickup=LOADS.filter(function(l){return l.status==="available";});
-  const dispatched=LOADS.filter(function(l){return ["dispatched","enroute"].indexOf(l.status)>=0||(l.driver&&isActive(l)&&l.status!=="available");});
+  const dispatched=LOADS.filter(function(l){return (l.driver||["dispatched","enroute"].indexOf(l.status)>=0)&&isActive(l);});
+  const board=LOADS.filter(function(l){return !l.driver&&["dispatched","enroute"].indexOf(l.status)<0&&isActive(l);});
   const delivered=LOADS.filter(function(l){return l.status==="delivered"||l.status==="completed";});
   const onHold=LOADS.filter(function(l){return l.status==="hold"||(l.holds||[]).length>0;});
   const withLFD=needPickup.filter(function(l){return l.lfd;}).length;
@@ -569,9 +570,10 @@ function mDispatch(){
   const tile=function(n,label,cls){return `<div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-2xl font-semibold tabular ${cls||'text-slate-900'}">${n}</div><div class="mt-0.5 text-xs font-medium text-slate-500">${label}</div></div>`;};
   const evCell=function(tag,loc){return `<div><div class="text-[10px] font-medium uppercase tracking-wide text-slate-400">${tag}</div><div class="text-xs text-slate-600">${loc?loc:'<span class="text-slate-300">No location</span>'}</div></div>`;};
 
-  const tabs=[{key:"all",label:"All",n:LOADS.length},{key:"available",label:"Available",n:needPickup.length},{key:"dispatched",label:"Dispatched",n:dispatched.length},{key:"hold",label:"On hold",n:onHold.length},{key:"completed",label:"Delivered",n:delivered.length}];
-  let rows=LOADS;
-  if(state.tab==="dispatched")rows=dispatched;else if(state.tab==="completed")rows=delivered;else if(state.tab==="hold")rows=onHold;else if(state.tab==="available")rows=needPickup;
+  const tabs=[{key:"board",label:"Board",n:board.length},{key:"dispatched",label:"Dispatched",n:dispatched.length},{key:"completed",label:"Delivered",n:delivered.length},{key:"hold",label:"On hold",n:onHold.length},{key:"all",label:"All",n:LOADS.length}];
+  const curTab=state.tab||"board";
+  let rows;
+  if(curTab==="dispatched")rows=dispatched;else if(curTab==="completed")rows=delivered;else if(curTab==="hold")rows=onHold;else if(curTab==="all")rows=LOADS;else rows=board;
   if(state.search){const q=state.search;rows=rows.filter(function(l){return [l.id,l.container,l.mbl,l.customer,l.ssl,l.terminal,(l.meta&&l.meta.ref)||""].join(" ").toLowerCase().includes(q);});}
 
   const byTerm={};LOADS.filter(isActive).forEach(function(l){if(l.terminal)byTerm[l.terminal]=(byTerm[l.terminal]||0)+1;});
@@ -590,7 +592,7 @@ function mDispatch(){
     ${chips}
     <div class="mb-3 flex items-center justify-between">
       <div class="flex items-center gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1">
-        ${tabs.map(function(t){return `<button onclick="setTab('${t.key}')" class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition ${state.tab===t.key?'bg-white text-slate-900 shadow-sm':'text-slate-500 hover:text-slate-800'}">${t.label} <span class="ml-1 text-xs text-slate-400">${t.n}</span></button>`;}).join("")}
+        ${tabs.map(function(t){return `<button onclick="setTab('${t.key}')" class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition ${curTab===t.key?'bg-white text-slate-900 shadow-sm':'text-slate-500 hover:text-slate-800'}">${t.label} <span class="ml-1 text-xs text-slate-400">${t.n}</span></button>`;}).join("")}
       </div>
       <button onclick="openCreateLoad()" class="wz-btn-brand ml-2 flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"><i data-lucide="plus" class="h-4 w-4"></i> New load</button>
     </div>
