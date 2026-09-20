@@ -428,7 +428,7 @@ function holdBadges(holds){
   return `<div class="flex flex-wrap gap-1">`+holds.map(h=>`<span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200">${h}</span>`).join("")+`</div>`;
 }
 function initials(n){return n.split(" ").map(x=>x[0]).join("");}
-function money(n){return "$"+n.toLocaleString();}
+function money(n){return "$"+(Number(n)||0).toLocaleString();}
 
 /* ---------------- STATE ---------------- */
 const state={active:"dispatch",tab:"all",customerView:false,custTab:"containers"};
@@ -611,7 +611,7 @@ function mDispatch(){
           <td class="px-3 py-3"><div class="font-medium text-sky-700">${l.id}</div></td>
           <td class="px-3 py-3"><span class="rounded px-1.5 py-0.5 text-xs tabular ${lfd.cls.indexOf('red')>=0?'bg-red-50':''} ${lfd.cls}">${lfd.txt}</span></td>
           <td class="px-3 py-3">${pill(l.status)}${(l.holds||[]).length?('<div class="mt-1">'+holdBadges(l.holds)+'</div>'):''}</td>
-          <td class="px-3 py-3">${l.driver?`<span class="text-slate-700">${l.driver}</span>`:`<button onclick="event.stopPropagation();openAssign('${l.id}')" class="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Assign</button>`}</td>
+          <td class="px-3 py-3">${l.driver?`<div><span class="text-slate-700">${l.driver}</span>${(l.meta&&l.meta.dispatchDate)?`<div class="text-[10px] font-medium text-sky-600">${fmtDay(l.meta.dispatchDate)}</div>`:""}</div>`:`<button onclick="event.stopPropagation();openAssign('${l.id}')" class="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Assign</button>`}</td>
           <td class="px-3 py-3">${evCell("Pick Up Container",l.terminal)}</td>
           <td class="px-3 py-3">${evCell(l.type==="EXP"?"Load Container":"Deliver Container",l.consignee)}</td>
           <td class="px-3 py-3">${evCell("Return Container",l.terminal)}</td>
@@ -663,6 +663,7 @@ function openLoad(id){
         </div>
       </div>
       ${marginBar(l)}
+      ${l.driver?`<div class="mb-4 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800"><i data-lucide="calendar-clock" class="h-4 w-4"></i> Dispatched to ${l.driver}${(l.meta&&l.meta.dispatchDate)?(" — "+fmtDay(l.meta.dispatchDate)):""}</div>`:""}
       ${loadDetails(l)}
       <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Appointments</h3>
         <div class="grid grid-cols-2 gap-3">
@@ -729,11 +730,12 @@ function loadCard(l,opts){
 }
 
 function mPlanner(){
+  const pd=state.planDate||wzToday();
   const unassigned=LOADS.filter(l=>!l.driver&&l.status!=="completed");
-  const byDriver=DRIVERS.map(d=>({...d,jobs:LOADS.filter(l=>l.driver===d.name&&l.status!=="completed")}));
+  const byDriver=DRIVERS.map(d=>({...d,jobs:LOADS.filter(l=>l.driver===d.name&&l.status!=="completed"&&((l.meta&&l.meta.dispatchDate)?l.meta.dispatchDate===pd:pd===wzToday()))}));
   return `<div class="p-6">
     <div class="mb-4 flex items-center justify-between">
-      <div><h2 class="text-sm font-semibold text-slate-900">Driver planner — Sep 14</h2><p class="text-xs text-slate-500">Drag a load onto a driver, or use auto-assign. Live GPS ETA shown vs appointment window.</p></div>
+      <div class="flex items-center gap-3"><div class="flex items-center gap-1"><button onclick="planShift(-1)" class="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"><i data-lucide="chevron-left" class="h-4 w-4"></i></button><input type="date" value="${pd}" onchange="setPlanDate(this.value)" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm"/><button onclick="planShift(1)" class="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"><i data-lucide="chevron-right" class="h-4 w-4"></i></button></div><div><h2 class="text-sm font-semibold text-slate-900">Driver planner — ${fmtDay(pd)}</h2><p class="text-xs text-slate-500">Assign loads for this day — they stay scheduled and drivers see the date.</p></div></div>
       <div class="flex items-center gap-3 text-xs text-slate-500">
         <span class="flex items-center gap-1"><i data-lucide="navigation" class="h-3 w-3 text-emerald-600"></i> on time</span>
         <span class="flex items-center gap-1"><i data-lucide="navigation" class="h-3 w-3 text-amber-600"></i> late risk</span>
@@ -1055,7 +1057,7 @@ window.dragLoad=dragLoad;window.allowDrop=allowDrop;window.dropOn=dropOn;
 
 /* ===== Pointer-based drag (mouse + touch) for the planner ===== */
 let wzDrag=null;
-function planAssign(id,driver){const l=LOADS.find(x=>x.id===id);if(!l)return;if(driver){l.driver=driver;if(l.status==="available")l.status="dispatched";toast("Moved "+id+" to "+driver);}else{l.driver=null;if(l.status==="dispatched")l.status="available";toast(id+" moved to Unassigned");}wzUpsertLoad(l);render();}
+function planAssign(id,driver){const l=LOADS.find(x=>x.id===id);if(!l)return;if(driver){l.driver=driver;if(l.status==="available")l.status="dispatched";l.meta=l.meta||{};l.meta.dispatchDate=state.planDate||wzToday();toast("Moved "+id+" to "+driver+" for "+fmtDay(l.meta.dispatchDate));}else{l.driver=null;if(l.status==="dispatched")l.status="available";toast(id+" moved to Unassigned");}wzUpsertLoad(l);render();}
 function planClearHi(){document.querySelectorAll("[data-drop].wz-drop-on").forEach(x=>x.classList.remove("wz-drop-on"));}
 function planDown(e){
   const card=e.target.closest&&e.target.closest(".plan-card");
@@ -1163,6 +1165,7 @@ function openAssign(id){
      </div>
      <div class="flex-1 space-y-3 overflow-auto px-6 py-5">
        <div class="text-xs text-slate-400">AI-ranked by hours of service, current load, availability & equipment.</div>
+       <div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><label class="mb-1 block text-xs font-medium text-slate-500">Schedule date — the day the driver runs it</label><input id="oa_date" type="date" value="${(l.meta&&l.meta.dispatchDate)||wzToday()}" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400"/></div>
        ${ranked.map((r,i)=>`<div class="rounded-xl border ${i===0?'border-sky-300 ring-1 ring-sky-200':'border-slate-200'} p-3">
          <div class="flex items-center gap-3">
            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-white">${initials(r.d.name)}</div>
@@ -1177,7 +1180,7 @@ function openAssign(id){
    </div>`;
   drawIcons();
 }
-function assignDriver(id,name){const l=LOADS.find(x=>x.id===id);l.driver=name;if(l.status==="available")l.status="dispatched";closeLoad();toast("Assigned "+id+" to "+name);wzUpsertLoad(l);render();}
+function assignDriver(id,name){const l=LOADS.find(x=>x.id===id);l.driver=name;if(l.status==="available")l.status="dispatched";l.meta=l.meta||{};l.meta.dispatchDate=val("oa_date")||wzToday();closeLoad();toast("Assigned "+id+" to "+name+" for "+fmtDay(l.meta.dispatchDate));wzUpsertLoad(l);render();}
 window.openAssign=openAssign;window.assignDriver=assignDriver;
 
 /* ---------------- BATCH 1: MODULES ---------------- */
@@ -2735,6 +2738,13 @@ function saveLoadMeta(id){
   if(WZ.sb)wzUpsertLoad(l);toast("Load details saved");openLoad(id);render();
 }
 window.saveLoadMeta=saveLoadMeta;
+
+/* ================= DISPATCH-AHEAD SCHEDULING ================= */
+function wzToday(){return new Date().toISOString().slice(0,10);}
+function fmtDay(d){if(!d)return"";try{return new Date(d+"T00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});}catch(e){return d;}}
+function setPlanDate(d){state.planDate=d;render();}
+function planShift(n){var d=new Date((state.planDate||wzToday())+"T00:00");d.setDate(d.getDate()+n);state.planDate=d.toISOString().slice(0,10);render();}
+window.setPlanDate=setPlanDate;window.planShift=planShift;
 
 function render(){
   renderNav();
