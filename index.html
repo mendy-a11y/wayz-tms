@@ -2316,7 +2316,7 @@ function loadDriverPay(l){const dp=driverPay(destCity(l));return dp?dp[3]:0;}
 function invState(){if(!state.inv)state.inv={sel:null,acc:{}};return state.inv;}
 function invSel(id){invState().sel=id;render();}
 function invAddAcc(id){const s=invState();s.acc[id]=(s.acc[id]||0)+75;toast("Detention +$75 captured on "+id);if(WZ.sb){try{WZ.sb.from("load_charges").insert({load_id:id,label:"Detention",amount:75,source:"captured"});}catch(e){}}render();}
-function invLines(l){const c=l.charges||{};const s=invState();const lines=[["Base drayage",c.base||0],["Fuel surcharge",c.fuel||0]];if(c.demurrage)lines.push(["Demurrage recovery",c.demurrage]);if(c.perdiem)lines.push(["Per-diem recovery",c.perdiem]);(c.items||[]).forEach(function(it){lines.push([it.label||"Accessorial",Number(it.amount)||0]);});if(s.acc[l.id])lines.push(["Detention (captured)",s.acc[l.id]]);return lines;}
+function invLines(l){const c=l.charges||{};const s=invState();const lines=[["Base drayage",c.base||0]];if(c.fuel)lines.push(["Fuel surcharge",c.fuel]);if(c.demurrage)lines.push(["Demurrage recovery",c.demurrage]);if(c.perdiem)lines.push(["Per-diem recovery",c.perdiem]);(c.items||[]).forEach(function(it){lines.push([it.label||"Accessorial",Number(it.amount)||0]);});if(s.acc[l.id])lines.push(["Detention (captured)",s.acc[l.id]]);return lines;}
 function invTotal(l){return invLines(l).reduce((a,x)=>a+x[1],0);}
 async function invCreate(id){const l=LOADS.find(x=>x.id===id);const total=invTotal(l);const lines=invLines(l);const number="WZ-INV-"+(10242+(state._invn=(state._invn||0)+1));BK_INV.unshift([(l&&l.customer)||"Customer",number,"$"+total.toLocaleString(),"today","Open"]);toast("Invoice "+number+" created for "+id+" - $"+total.toLocaleString());wzConfetti();if(l){l.status="completed";}if(WZ.sb){try{const r=await WZ.sb.from("invoices").insert({number,load_id:id,total,status:"sent"}).select().single();if(r.data&&lines.length)await WZ.sb.from("invoice_lines").insert(lines.map(x=>({invoice_id:r.data.id,label:x[0],amount:x[1]})));await wzUpsertLoad(l);}catch(e){toast("Saved locally - DB: "+(e.message||e));}}render();}
 window.invSel=invSel;window.invAddAcc=invAddAcc;window.invCreate=invCreate;
@@ -2606,7 +2606,7 @@ function accRow(label,amt,idOrNull,idx){return `<div class="flex items-center ju
 function accSection(l){
   const c=l.charges||{};let rows="";
   rows+=accRow("Base drayage",c.base||0,null,null);
-  rows+=accRow("Fuel surcharge",c.fuel||0,null,null);
+  if(c.fuel)rows+=accRow("Fuel surcharge",c.fuel,null,null);
   if(c.demurrage)rows+=accRow("Demurrage",c.demurrage,null,null);
   if(c.perdiem)rows+=accRow("Per diem",c.perdiem,null,null);
   (c.items||[]).forEach(function(it,idx){rows+=accRow(it.label||"Accessorial",it.amount,l.id,idx);});
@@ -2633,7 +2633,7 @@ function suggestAccessorials(id){
   const l=LOADS.find(function(x){return x.id===id;});if(!l)return;
   const cust=l.customer||"";const who=cust?("Ava ("+cust+")"):"Ava";
   const sug=[];
-  if(l.pickupAppt){const days=Math.max(1,daysBetween(l.pickupAppt,l.deliveryAppt));const rate=rateGet("chassis_day",cust);const amt=days*rate;sug.push({label:"Chassis",amount:amt,reason:who+": pulled "+fmtAppt(l.pickupAppt)+(l.deliveryAppt?(", returned "+fmtAppt(l.deliveryAppt)):"")+" ("+days+" day"+(days>1?"s":"")+") \u00b7 Penny: "+days+" \u00d7 "+money(rate)+" = "+money(amt)});}
+  var _m=l.meta||{},_d=_m.dates||{};var chS=_d.outgate||l.pickupAppt,chE=_d.ingate||_d.empty||l.deliveryAppt;if(chS){const days=Math.max(1,daysBetween(chS,chE));const rate=rateGet("chassis_day",cust);const amt=days*rate;sug.push({label:"Chassis",amount:amt,reason:who+": chassis out "+fmtAppt(chS)+(chE?(", terminated "+fmtAppt(chE)):"")+" ("+days+" day"+(days>1?"s":"")+") \u00b7 Penny: "+days+" \u00d7 "+money(rate)+" = "+money(amt)});}
   if(l.lfd){const free=rateGet("free_days",cust);const raw=daysBetween(l.lfd,l.deliveryAppt||l.pickupAppt);const days=raw-free;if(days>0){const rate=rateGet("perdiem_day",cust);const amt=days*rate;sug.push({label:"Per diem",amount:amt,reason:who+": LFD "+l.lfd+", "+raw+" day"+(raw>1?"s":"")+" past"+(free>0?(" minus "+free+" free"):"")+" \u00b7 Penny: "+days+" \u00d7 "+money(rate)+" = "+money(amt)});}}
   if(/prepull/i.test(l.routing||"")){const amt=rateGet("prepull",cust);if(amt>0)sug.push({label:"Prepull",amount:amt,reason:who+": routing is "+l.routing+" \u00b7 Penny: flat "+money(amt)});}
   if(!sug.length){toast("No billable accessorials from this load\u2019s dates/routing");return;}
@@ -2892,7 +2892,7 @@ function openCreateLoad(){wzModal(`
 async function submitLoad(){
   const container=val("wzl_container");if(!container){toast("Container # is required");return;}
   const id=nextLoadId();const base=Number(val("wzl_base"))||0;
-  const rec={id,container,mbl:val("wzl_mbl"),ssl:val("wzl_ssl"),terminal:val("wzl_terminal"),routing:val("wzl_routing"),type:val("wzl_type"),size:val("wzl_size"),customer_name:val("wzl_customer"),consignee:val("wzl_consignee"),lfd:val("wzl_lfd")||null,pickup_appt:val("wzl_pappt")||null,delivery_appt:val("wzl_dappt")||null,appt:val("wzl_pappt")||null,status:"available",charges:{base:base,fuel:Math.round(base*0.32)},holds:[]};
+  const rec={id,container,mbl:val("wzl_mbl"),ssl:val("wzl_ssl"),terminal:val("wzl_terminal"),routing:val("wzl_routing"),type:val("wzl_type"),size:val("wzl_size"),customer_name:val("wzl_customer"),consignee:val("wzl_consignee"),lfd:val("wzl_lfd")||null,pickup_appt:val("wzl_pappt")||null,delivery_appt:val("wzl_dappt")||null,appt:val("wzl_pappt")||null,status:"available",charges:{base:base},holds:[]};
   LOADS.unshift(wzMapLoad(rec));
   if(WZ.sb){try{const r=await WZ.sb.from("loads").insert(rec);if(r.error)throw r.error;}catch(e){toast("Created locally · DB error: "+(e.message||e));}}
   wzClose();toast("Load created: "+id);wzConfetti();setActive("dispatch");
