@@ -559,61 +559,64 @@ window.toggleNav=toggleNav;
 
 /* ---------------- MODULES ---------------- */
 function mDispatch(){
-  const tabs=[
-    {key:"all",label:"All loads",n:LOADS.length},
-    {key:"available",label:"Available",n:LOADS.filter(l=>l.status==="available").length},
-    {key:"dispatched",label:"Dispatched",n:LOADS.filter(l=>["dispatched","enroute"].includes(l.status)).length},
-    {key:"hold",label:"On hold",n:LOADS.filter(l=>l.status==="hold").length},
-    {key:"completed",label:"Completed",n:LOADS.filter(l=>l.status==="completed").length},
-  ];
-  let rows=LOADS;
-  if(state.tab==="dispatched")rows=LOADS.filter(l=>["dispatched","enroute"].includes(l.status));
-  else if(state.tab!=="all")rows=LOADS.filter(l=>l.status===state.tab);
-  if(state.search){const q=state.search;rows=rows.filter(l=>[l.id,l.container,l.mbl,l.customer,l.ssl,l.terminal].join(" ").toLowerCase().includes(q));}
+  const isActive=function(l){return l.status!=="delivered"&&l.status!=="completed";};
+  const needPickup=LOADS.filter(function(l){return l.status==="available";});
+  const dispatched=LOADS.filter(function(l){return ["dispatched","enroute"].indexOf(l.status)>=0||(l.driver&&isActive(l)&&l.status!=="available");});
+  const delivered=LOADS.filter(function(l){return l.status==="delivered"||l.status==="completed";});
+  const onHold=LOADS.filter(function(l){return l.status==="hold"||(l.holds||[]).length>0;});
+  const withLFD=needPickup.filter(function(l){return l.lfd;}).length;
+  const withAppt=needPickup.filter(function(l){return l.pickupAppt;}).length;
+  const tile=function(n,label,cls){return `<div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-2xl font-semibold tabular ${cls||'text-slate-900'}">${n}</div><div class="mt-0.5 text-xs font-medium text-slate-500">${label}</div></div>`;};
+  const evCell=function(tag,loc){return `<div><div class="text-[10px] font-medium uppercase tracking-wide text-slate-400">${tag}</div><div class="text-xs text-slate-600">${loc?loc:'<span class="text-slate-300">No location</span>'}</div></div>`;};
 
-  const stats=[
-    {label:"Active loads",value:"5",sub:"2 en route",tone:"text-slate-900"},
-    {label:"Demurrage at risk",value:demExposureTicker(),sub:"accruing live",tone:"text-amber-600"},
-    {label:"On hold",value:"1",sub:"Customs + Freight",tone:"text-red-600"},
-    {label:"Drivers available",value:"1",sub:"of 4 on shift",tone:"text-emerald-600"},
-  ];
+  const tabs=[{key:"all",label:"All",n:LOADS.length},{key:"available",label:"Available",n:needPickup.length},{key:"dispatched",label:"Dispatched",n:dispatched.length},{key:"hold",label:"On hold",n:onHold.length},{key:"completed",label:"Delivered",n:delivered.length}];
+  let rows=LOADS;
+  if(state.tab==="dispatched")rows=dispatched;else if(state.tab==="completed")rows=delivered;else if(state.tab==="hold")rows=onHold;else if(state.tab==="available")rows=needPickup;
+  if(state.search){const q=state.search;rows=rows.filter(function(l){return [l.id,l.container,l.mbl,l.customer,l.ssl,l.terminal,(l.meta&&l.meta.ref)||""].join(" ").toLowerCase().includes(q);});}
+
+  const byTerm={};LOADS.filter(isActive).forEach(function(l){if(l.terminal)byTerm[l.terminal]=(byTerm[l.terminal]||0)+1;});
+  const chips=Object.keys(byTerm).length?`<div class="mb-3 flex flex-wrap gap-2">${Object.keys(byTerm).map(function(t){return `<span class="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">${t}: ${byTerm[t]}</span>`;}).join("")}</div>`:"";
+
+  const tiles=`<div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+    <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="flex items-baseline gap-2"><span class="text-2xl font-semibold tabular text-slate-900">${needPickup.length}</span><span class="text-xs font-medium text-slate-500">Need pickup</span></div><div class="mt-3 grid grid-cols-2 gap-2"><div class="rounded-lg bg-slate-50 px-2 py-1.5 text-center"><div class="text-sm font-semibold tabular text-amber-600">${withLFD}</div><div class="text-[10px] text-slate-400">LFD</div></div><div class="rounded-lg bg-slate-50 px-2 py-1.5 text-center"><div class="text-sm font-semibold tabular text-slate-700">${withAppt}</div><div class="text-[10px] text-slate-400">Pickup appt</div></div></div></div>
+    ${tile(dispatched.length,"Dispatched","text-blue-600")}
+    ${tile(onHold.length,"On hold",onHold.length?"text-red-600":"text-slate-900")}
+    ${tile(delivered.length,"Delivered","text-emerald-600")}
+    ${tile(LOADS.filter(isActive).length,"Active total","text-slate-900")}
+  </div>`;
 
   return `<div class="p-6">
-    <div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      ${stats.map(s=>`<div class="rounded-xl border border-slate-200 bg-white p-4">
-        <div class="text-xs font-medium text-slate-500">${s.label}</div>
-        <div class="mt-1 text-2xl font-semibold tabular ${s.tone}">${s.value}</div>
-        <div class="mt-0.5 text-xs text-slate-400">${s.sub}</div></div>`).join("")}
-    </div>
+    ${tiles}
+    ${chips}
     <div class="mb-3 flex items-center justify-between">
-      <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-        ${tabs.map(t=>`<button onclick="setTab('${t.key}')" class="rounded-md px-3 py-1.5 text-sm font-medium transition ${state.tab===t.key?'bg-white text-slate-900 shadow-sm':'text-slate-500 hover:text-slate-800'}">${t.label} <span class="ml-1 text-xs text-slate-400">${t.n}</span></button>`).join("")}
+      <div class="flex items-center gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1">
+        ${tabs.map(function(t){return `<button onclick="setTab('${t.key}')" class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition ${state.tab===t.key?'bg-white text-slate-900 shadow-sm':'text-slate-500 hover:text-slate-800'}">${t.label} <span class="ml-1 text-xs text-slate-400">${t.n}</span></button>`;}).join("")}
       </div>
-      <button onclick="toast(&#39;Filter with the status tabs above&#39;)" class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"><i data-lucide="filter" class="h-4 w-4"></i> Filters</button>
+      <button onclick="openCreateLoad()" class="wz-btn-brand ml-2 flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"><i data-lucide="plus" class="h-4 w-4"></i> New load</button>
     </div>
     <div class="mb-3 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2">
       <span class="flex flex-shrink-0 items-center gap-1 px-1 text-[11px] font-medium text-slate-400">Drag a load's <i data-lucide="grip-vertical" class="h-3 w-3"></i> onto a driver</span>
-      ${DRIVERS.map(d=>`<div data-drop data-driver="${d.name}" class="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5"><div class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-[10px] font-semibold text-white">${initials(d.name)}</div><span class="text-xs font-medium text-slate-700">${d.name}</span></div>`).join("")}
+      ${DRIVERS.map(function(d){return `<div data-drop data-driver="${d.name}" class="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5"><div class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-[10px] font-semibold text-white">${initials(d.name)}</div><span class="text-xs font-medium text-slate-700">${d.name}</span></div>`;}).join("")}
       <div data-drop data-driver="" class="flex-shrink-0 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-500">Unassign</div>
     </div>
-    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white" data-dragboard>
-      <table class="w-full text-sm"><thead>
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white" data-dragboard>
+      <table class="w-full min-w-[960px] text-sm"><thead>
         <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500">
-          <th class="px-2 py-3"></th><th class="px-4 py-3">Load</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Container</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Terminal</th><th class="px-4 py-3">LFD</th><th class="px-4 py-3">Holds</th><th class="px-4 py-3">Driver</th><th class="px-4 py-3">Appt</th><th class="px-4 py-3"></th>
+          <th class="px-2 py-3"></th><th class="px-3 py-3">Load #</th><th class="px-3 py-3">LFD/ERD</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Driver</th><th class="px-3 py-3">Event 1</th><th class="px-3 py-3">Event 2</th><th class="px-3 py-3">Event 3</th><th class="px-3 py-3">Container #</th><th class="px-3 py-3">Reference #</th><th class="px-3 py-3">Type</th>
         </tr></thead><tbody class="divide-y divide-slate-100">
-        ${rows.map(l=>{const lfd=lfdMeta(l.lfd);return `<tr onclick="openLoad('${l.id}')" class="cursor-pointer transition hover:bg-sky-50/40">
-          <td class="px-2 py-3"><span class="plan-card inline-flex h-6 w-6 cursor-grab items-center justify-center text-slate-300 hover:text-slate-600 active:cursor-grabbing" data-load="${l.id}" data-ghost="${l.id} · ${l.container}" onclick="event.stopPropagation()"><i data-lucide="grip-vertical" class="h-4 w-4"></i></span></td>
-          <td class="px-4 py-3"><div class="font-medium text-slate-900">${l.id}</div><div class="text-xs text-slate-400">${l.ref}</div></td>
-          <td class="px-4 py-3">${pill(l.status)}</td>
-          <td class="px-4 py-3"><div class="flex items-center gap-2">${typeBadge(l.type)}<span class="font-mono text-xs text-slate-700">${l.container}</span>${flagChips(l.id)}</div><div class="mt-0.5 text-xs text-slate-400">${l.ssl} · ${l.size} · ${l.routing}</div></td>
-          <td class="px-4 py-3 text-slate-700">${l.customer}</td>
-          <td class="px-4 py-3 text-slate-600">${l.terminal}</td>
-          <td class="px-4 py-3 tabular ${lfd.cls}">${lfd.txt}${accrualCell(l)}</td>
-          <td class="px-4 py-3">${holdBadges(l.holds)}</td>
-          <td class="px-4 py-3">${l.driver?`<span class="text-slate-700">${l.driver}</span>`:`<button onclick="event.stopPropagation();openAssign('${l.id}')" class="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Assign</button>`}</td>
-          <td class="px-4 py-3 text-xs text-slate-500">${fmtAppt(l.pickupAppt||l.appt)}</td>
-          <td class="px-4 py-3 text-right"><i data-lucide="chevron-right" class="h-4 w-4 text-slate-300 inline"></i></td>
-        </tr>`;}).join("")}
+        ${rows.length?rows.map(function(l){const lfd=lfdMeta(l.lfd);const ref=(l.meta&&l.meta.ref)||l.ref||"";return `<tr onclick="openLoad('${l.id}')" class="cursor-pointer transition hover:bg-sky-50/40">
+          <td class="px-2 py-3"><span class="plan-card inline-flex h-6 w-6 cursor-grab items-center justify-center text-slate-300 hover:text-slate-600 active:cursor-grabbing" data-load="${l.id}" data-ghost="${l.id} \u00b7 ${l.container}" onclick="event.stopPropagation()"><i data-lucide="grip-vertical" class="h-4 w-4"></i></span></td>
+          <td class="px-3 py-3"><div class="font-medium text-sky-700">${l.id}</div></td>
+          <td class="px-3 py-3"><span class="rounded px-1.5 py-0.5 text-xs tabular ${lfd.cls.indexOf('red')>=0?'bg-red-50':''} ${lfd.cls}">${lfd.txt}</span></td>
+          <td class="px-3 py-3">${pill(l.status)}${(l.holds||[]).length?('<div class="mt-1">'+holdBadges(l.holds)+'</div>'):''}</td>
+          <td class="px-3 py-3">${l.driver?`<span class="text-slate-700">${l.driver}</span>`:`<button onclick="event.stopPropagation();openAssign('${l.id}')" class="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Assign</button>`}</td>
+          <td class="px-3 py-3">${evCell("Pick Up Container",l.terminal)}</td>
+          <td class="px-3 py-3">${evCell(l.type==="EXP"?"Load Container":"Deliver Container",l.consignee)}</td>
+          <td class="px-3 py-3">${evCell("Return Container",l.terminal)}</td>
+          <td class="px-3 py-3"><div class="font-mono text-xs text-slate-700">${l.container}</div><div class="mt-0.5 text-[10px] text-slate-400">${l.size||""} ${(l.meta&&l.meta.containerType)?("\u00b7 "+l.meta.containerType):""} ${l.ssl?("\u00b7 "+l.ssl):""}</div></td>
+          <td class="px-3 py-3 text-xs text-slate-500">${ref||"\u2014"}</td>
+          <td class="px-3 py-3 text-xs text-slate-600">${l.type==="EXP"?"Export":"Import"}</td>
+        </tr>`;}).join(""):'<tr><td colspan="11" class="px-4 py-10 text-center text-sm text-slate-400">No loads in this view.</td></tr>'}
       </tbody></table>
     </div></div>`;
 }
