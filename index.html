@@ -267,6 +267,7 @@ const NAV = [
     {key:"autorebook",label:"Auto-Rebook",icon:"calendar-clock"},
     {key:"emailintake",label:"Email Intake",icon:"mail-open",tag:1},
     {key:"watchlist",label:"Watchlist",icon:"bell-ring"},
+    {key:"problems",label:"Problem Containers",icon:"triangle-alert"},
     {key:"streetturns",label:"Street Turns",icon:"repeat"},
     {key:"whatif",label:"What-If Simulator",icon:"shuffle"},
     {key:"yard",label:"Yard",icon:"warehouse"},
@@ -324,7 +325,11 @@ const NAV = [
     {key:"publicapi",label:"API & Webhooks",icon:"plug"},
     {key:"integrations",label:"Connections",icon:"plug",tag:1},
   ]},
+  {section:"Tracking",items:[
+    {key:"tracking",label:"Tracking",icon:"map"},
+  ]},
   {section:"Insights",items:[
+    {key:"reports",label:"Reports",icon:"line-chart"},
     {key:"execdash",label:"Executive Dashboard",icon:"layout-dashboard"},
     {key:"analytics",label:"Analytics",icon:"bar-chart-3"},
     {key:"laneforecast",label:"Lane Forecast",icon:"trending-up"},
@@ -343,6 +348,21 @@ const NAV = [
     {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
     {key:"approvals",label:"Ava Approvals",icon:"check-check"},
   ]},
+  {section:"AR",items:[
+    {key:"arbilling",label:"Billing",icon:"receipt"},
+    {key:"arinvoices",label:"Invoices",icon:"file-text"},
+    {key:"araging",label:"Aging",icon:"calendar-clock"},
+    {key:"arcollections",label:"Collections",icon:"alert-circle"},
+    {key:"billingexc",label:"Billing Exceptions",icon:"circle-alert"},
+    {key:"perdiemaudit",label:"Per Diem Audit",icon:"clock"},
+    {key:"arapply",label:"Apply Payments",icon:"banknote"},
+    {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
+  ]},
+  {section:"AP",items:[
+    {key:"apdriverpay",label:"Driver Pay",icon:"banknote"},
+    {key:"apsettlements",label:"Driver Settlements",icon:"wallet"},
+    {key:"apded",label:"Deductions",icon:"minus-circle"},
+  ]},
   {section:"Wayz Books",items:[
     {key:"books",label:"Dashboard",icon:"book-open"},
     {key:"pnl",label:"Profit & Loss",icon:"trending-up"},
@@ -350,12 +370,6 @@ const NAV = [
     {key:"arbooks",label:"Invoices (A/R)",icon:"file-text"},
     {key:"payments",label:"Payments",icon:"banknote"},
     {key:"statements",label:"Statements",icon:"mail"},
-    {key:"arbilling",label:"Billing",icon:"receipt"},
-    {key:"arinvoices",label:"Invoices",icon:"file-text"},
-    {key:"araging",label:"Aging",icon:"calendar-clock"},
-    {key:"arcollections",label:"Collections",icon:"alert-circle"},
-    {key:"arapply",label:"Apply Payments",icon:"banknote"},
-    {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
     {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
     {key:"autoinvoice",label:"Auto-Invoicing",icon:"file-check-2"},
     {key:"batchinvoice",label:"Batch Invoicing",icon:"files"},
@@ -2194,9 +2208,12 @@ const SECTION_HUBS=[
   {section:"Drivers",label:"Drivers",icon:"users",land:"drivers"},
   {section:"Customer",label:"Customer & Sales",icon:"building-2",land:"customers"},
   {section:"Integrations",label:"Integrations",icon:"plug",land:"integrations"},
-  {section:"Insights",label:"Insights",icon:"bar-chart-3",land:"execdash"},
+  {section:"Tracking",label:"Tracking",icon:"map",land:"tracking"},
+  {section:"Insights",label:"Reports",icon:"line-chart",land:"reports"},
   {section:"OTR",label:"OTR / FTL",icon:"route",land:"otr"},
   {section:"AI",label:"AI Assistant",icon:"sparkles",land:"ai"},
+  {section:"AR",label:"Accounts Receivable",icon:"receipt",land:"arbilling"},
+  {section:"AP",label:"Accounts Payable",icon:"wallet",land:"apdriverpay"},
   {section:"Wayz Books",label:"Wayz Books",icon:"book-open",land:"books"},
   {section:"System",label:"Settings",icon:"settings",land:"roles"},
 ];
@@ -2819,13 +2836,100 @@ function mARApply(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="banknote" class="h-4 w-4"></i> Apply a customer payment to close out an invoice.</div>${k}${panel("Apply payments & credits",tbl(["Invoice","Customer","Amount",""],rows))}</div>`;
 }
 
+/* ================= ACCOUNTS PAYABLE (driver pay) ================= */
+function apPayItems(){return LOADS.filter(function(l){return l.driver&&l.status!=="available";}).map(function(l){return {load:l.id,driver:l.driver,dest:(typeof destCity==="function"?destCity(l):(l.consignee||"")),amt:(typeof loadDriverPay==="function"?(loadDriverPay(l)||0):0),status:(l.status==="delivered"||l.status==="completed")?"ready":"pending"};});}
+function apDedState(){if(!state.ded)state.ded={list:null,loaded:false};return state.ded;}
+async function apDedLoad(){const s=apDedState();if(!WZ.sb){s.list=[];s.loaded=true;return;}try{const r=await WZ.sb.from("deductions").select("*");if(!r.error)s.list=r.data||[];}catch(e){s.list=[];}s.loaded=true;if(state.active==="apded")render();}
+function apDeds(){const s=apDedState();if(WZ.sb&&!s.loaded)apDedLoad();return s.list||[];}
+async function addDeduction(){const drv=val("ded_driver"),lab=val("ded_label"),amt=parseFloat(val("ded_amt"))||0;if(!drv||!lab||!amt){toast("Fill driver, label and amount");return;}const s=apDedState();s.list=s.list||[];if(WZ.sb){try{const r=await WZ.sb.from("deductions").insert({driver:drv,label:lab,amount:amt}).select().single();if(r.error)throw r.error;s.list.push(r.data||{driver:drv,label:lab,amount:amt});}catch(e){toast("DB error: "+(e.message||e));return;}}else{s.list.push({driver:drv,label:lab,amount:amt});}toast("Deduction added");render();}
+async function delDeduction(id){if(WZ.sb&&id){try{await WZ.sb.from("deductions").delete().eq("id",id);}catch(e){}}const s=apDedState();s.list=(s.list||[]).filter(function(d){return d.id!==id;});render();}
+window.addDeduction=addDeduction;window.delDeduction=delDeduction;
+
+function mAPDriverPay(){
+  const items=apPayItems();
+  const rows=items.length?items.map(function(p){return `<tr class="hover:bg-slate-50"><td class="cursor-pointer px-4 py-3 font-medium text-sky-700" onclick="openLoad('${p.load}')">${p.load}</td><td class="px-4 py-3 text-slate-700">${p.driver}</td><td class="px-4 py-3 text-slate-500">${p.dest||"\u2014"}</td><td class="px-4 py-3 tabular text-slate-800">${money(p.amt)}</td><td class="px-4 py-3">${p.status==="ready"?'<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">ready to pay</span>':'<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">in progress</span>'}</td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No driver pay yet \u2014 assign loads to drivers.</td></tr>';
+  const total=items.reduce(function(a,p){return a+p.amt;},0);const ready=items.filter(function(p){return p.status==="ready";}).reduce(function(a,p){return a+p.amt;},0);
+  const k=kpis([["Total driver pay",money(total)],["Ready to pay",money(ready),"text-emerald-600"],["Pay items",String(items.length)]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="banknote" class="h-4 w-4"></i> Per-move driver pay, from your pay-rate table.</div>${k}${panel("Driver pay",tbl(["Load","Driver","Move","Amount","Status"],rows))}</div>`;
+}
+function mAPSettlements(){
+  const deds=apDeds();
+  const byDriver=DRIVERS.map(function(d){var jobs=LOADS.filter(function(l){return l.driver===d.name&&l.status!=="available";});var gross=jobs.reduce(function(a,l){return a+(typeof loadDriverPay==="function"?(loadDriverPay(l)||0):0);},0);var ded=deds.filter(function(x){return x.driver===d.name;}).reduce(function(a,x){return a+(Number(x.amount)||0);},0);return {name:d.name,moves:jobs.length,gross:gross,ded:ded,net:gross-ded};}).filter(function(x){return x.moves>0||x.ded>0;});
+  const rows=byDriver.length?byDriver.map(function(s){return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">${s.name}</td><td class="px-4 py-3 tabular text-slate-600">${s.moves}</td><td class="px-4 py-3 tabular text-slate-700">${money(s.gross)}</td><td class="px-4 py-3 tabular text-red-600">-${money(s.ded)}</td><td class="px-4 py-3 tabular font-semibold text-slate-900">${money(s.net)}</td><td class="px-4 py-3 text-right"><button onclick="toast('Settlement generated for ${s.name}')" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Run settlement</button></td></tr>`;}).join(""):'<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No settlements to run yet.</td></tr>';
+  const netTot=byDriver.reduce(function(a,s){return a+s.net;},0);
+  const k=kpis([["Net payable",money(netTot)],["Drivers",String(byDriver.length)],["Deductions",money(byDriver.reduce(function(a,s){return a+s.ded;},0)),"text-red-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="wallet" class="h-4 w-4"></i> Weekly driver settlements \u2014 gross pay minus deductions.</div>${k}${panel("Driver settlements",tbl(["Driver","Moves","Gross","Deductions","Net",""],rows))}</div>`;
+}
+function mAPDeductions(){
+  const deds=apDeds();
+  const rows=deds.length?deds.map(function(d){return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-700">${d.driver}</td><td class="px-4 py-3 text-slate-700">${d.label}</td><td class="px-4 py-3 tabular text-slate-800">${money(d.amount)}</td><td class="px-4 py-3 text-right">${d.id?`<button onclick="delDeduction('${d.id}')" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="h-4 w-4"></i></button>`:""}</td></tr>`;}).join(""):'<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No deductions set.</td></tr>';
+  const add=`<div class="wz-card"><div class="wz-card-head">Add deduction</div><div class="space-y-2 p-4"><select id="ded_driver" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">${DRIVERS.length?DRIVERS.map(function(d){return `<option>${d.name}</option>`;}).join(""):'<option>No drivers</option>'}</select><input id="ded_label" placeholder="e.g. Chassis rental, Escrow, Advance" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="ded_amt" type="number" placeholder="$ per settlement" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><button onclick="addDeduction()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Add deduction</button></div></div>`;
+  const k=kpis([["Deductions",String(deds.length)],["Total / cycle",money(deds.reduce(function(a,d){return a+(Number(d.amount)||0);},0)),"text-red-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="minus-circle" class="h-4 w-4"></i> Recurring driver deductions \u2014 applied on settlements.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Deductions",tbl(["Driver","Deduction","Amount",""],rows))}</div>${add}</div></div>`;
+}
+
+/* ================= PROBLEM CONTAINERS ================= */
+function loadIssues(l){
+  var out=[];
+  if((l.holds||[]).length)out.push("Holds: "+l.holds.join(", "));
+  if(l.lfd){var m=lfdMeta(l.lfd);if((m.txt||"").indexOf("overdue")>=0)out.push("LFD overdue");else if((m.txt||"").indexOf("today")>=0||(m.txt||"").indexOf("1d")>=0)out.push("LFD imminent");}
+  if(l.status==="available"&&!l.pickupAppt)out.push("No pickup appt");
+  if(l.status==="available"&&!l.driver)out.push("Unassigned");
+  return out;
+}
+function mProblemContainers(){
+  const probs=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";}).map(function(l){return {l:l,issues:loadIssues(l)};}).filter(function(x){return x.issues.length;});
+  const rows=probs.length?probs.map(function(p){var l=p.l;return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 text-slate-700">${l.customer||""}</td><td class="px-4 py-3 text-slate-500">${l.terminal||""}</td><td class="px-4 py-3"><div class="flex flex-wrap gap-1">${p.issues.map(function(i){var red=/overdue|Holds/.test(i);return '<span class="rounded-full px-2 py-0.5 text-[10px] font-medium '+(red?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700')+'">'+i+'</span>';}).join("")}</div></td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">No problem containers \u2014 all clear.</td></tr>';
+  const k=kpis([["Problem containers",String(probs.length),probs.length?"text-red-600":"text-emerald-600"],["Holds",String(probs.filter(function(p){return p.issues.some(function(i){return /Holds/.test(i);});}).length)],["LFD risk",String(probs.filter(function(p){return p.issues.some(function(i){return /LFD/.test(i);});}).length),"text-amber-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="triangle-alert" class="h-4 w-4"></i> Containers that need attention \u2014 holds, LFD risk, missing appointments, unassigned.</div>${k}${panel("Problem containers",tbl(["Load","Container","Customer","Terminal","Issues"],rows))}</div>`;
+}
+
+/* ================= TRACKING + REPORTS ================= */
+function mTracking(){
+  const rows=DRIVERS.length?DRIVERS.map(function(d){
+    var job=LOADS.find(function(l){return l.driver===d.name&&l.status!=="delivered"&&l.status!=="completed";});
+    var st=job?"On a move":(/off/i.test(d.status||"")?"Off duty":"Available");
+    var stc=job?"bg-indigo-50 text-indigo-700":(/off/i.test(d.status||"")?"bg-slate-100 text-slate-500":"bg-emerald-50 text-emerald-700");
+    return `<tr class="hover:bg-slate-50"><td class="px-4 py-3"><div class="flex items-center gap-2"><div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-[10px] font-semibold text-white">${initials(d.name)}</div><span class="font-medium text-slate-800">${d.name}</span></div></td><td class="px-4 py-3 text-slate-600">${d.truck||"\u2014"}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${stc}">${st}</span></td><td class="px-4 py-3 text-slate-600">${job?(job.container+" \u2192 "+(job.consignee||job.terminal||"")):'<span class="text-slate-300">\u2014</span>'}</td><td class="px-4 py-3 tabular text-slate-600">${(d.hos==null?"\u2014":d.hos+"h")}</td><td class="px-4 py-3 text-xs text-slate-400">${(typeof WZ!=="undefined"&&WZ.gps)?"live":"via Linxup"}</td></tr>`;
+  }).join(""):'<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No drivers yet.</td></tr>';
+  const onmove=DRIVERS.filter(function(d){return LOADS.some(function(l){return l.driver===d.name&&l.status!=="delivered"&&l.status!=="completed";});}).length;
+  const k=kpis([["Drivers",String(DRIVERS.length)],["On a move",String(onmove),"text-indigo-600"],["Available",String(Math.max(0,DRIVERS.length-onmove)),"text-emerald-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="map" class="h-4 w-4"></i> Live fleet tracking \u2014 driver positions and current moves (GPS via Linxup).</div>${k}${panel("Fleet",tbl(["Driver","Truck","Status","Current move","HOS","GPS"],rows))}</div>`;
+}
+function mReports(){
+  const cards=[["Revenue & margin","execdash","Load revenue, driver pay and margin trends","bar-chart-3"],["A/R aging","araging","Outstanding receivables by age bucket","calendar-clock"],["Driver performance","scorecards","Moves/day, on-time %, safety by driver","gauge"],["Profitability","profitability","Profit by lane, customer and driver","trending-up"],["Demurrage & per-diem","perdiem","Charges accrued and recovered","clock"],["Revenue leakage","leakage","Uncaptured accessorials and missed charges","circle-alert"]];
+  return `<div class="p-6"><div class="mb-4 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="line-chart" class="h-4 w-4"></i> Reports \u2014 jump into any analysis.</div><div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${cards.map(function(c){return `<button onclick="setActive('${c[1]}')" class="wz-card p-5 text-left transition hover:border-sky-300"><div class="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><i data-lucide="${c[3]}" class="h-5 w-5"></i></div><div class="mt-3 text-sm font-semibold text-slate-900">${c[0]}</div><div class="mt-1 text-xs text-slate-500">${c[2]}</div></button>`;}).join("")}</div></div>`;
+}
+
+/* ================= BILLING EXCEPTIONS + PER DIEM AUDIT ================= */
+function mBillingExceptions(){
+  const inv=arReady();const byLoad={};inv.forEach(function(i){if(i.load_id)byLoad[i.load_id]=i;});
+  const delivered=LOADS.filter(function(l){return l.status==="delivered"||l.status==="completed";});
+  const probs=delivered.map(function(l){var out=[];if(!l.customer)out.push("No customer");if(!((l.charges&&l.charges.base)||0))out.push("Missing rate");if(!byLoad[l.id])out.push("Awaiting invoice");return {l:l,issues:out};}).filter(function(x){return x.issues.length;});
+  const rows=probs.length?probs.map(function(p){var l=p.l;return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 text-slate-700">${l.customer||'<span class="text-red-500">\u2014</span>'}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 tabular text-slate-700">${money(accTotal(l))}</td><td class="px-4 py-3"><div class="flex flex-wrap gap-1">${p.issues.map(function(i){return '<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">'+i+'</span>';}).join("")}</div></td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No billing exceptions \u2014 everything is clean.</td></tr>';
+  const k=kpis([["Exceptions",String(probs.length),probs.length?"text-amber-600":"text-emerald-600"],["Missing rate",String(probs.filter(function(p){return p.issues.indexOf("Missing rate")>=0;}).length)],["Awaiting invoice",String(probs.filter(function(p){return p.issues.indexOf("Awaiting invoice")>=0;}).length)]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="circle-alert" class="h-4 w-4"></i> Delivered loads that can\u2019t be billed cleanly \u2014 fix these to get paid.</div>${k}${panel("Billing exceptions",tbl(["Load","Customer","Container","Charges","Issue"],rows))}</div>`;
+}
+function mPerDiemAudit(){
+  const rd=function(l){return (typeof rateGet==="function")?rateGet("perdiem_day",l.customer):150;};
+  const items=LOADS.filter(function(l){return l.lfd;}).map(function(l){
+    var dts=(l.meta&&l.meta.dates)||{};var free=dts.perdiemFree||l.lfd;var ret=dts.ingate||dts.empty||l.deliveryAppt;var days=0;
+    try{if(free&&ret){days=Math.max(0,Math.round((new Date(String(ret).slice(0,10))-new Date(String(free).slice(0,10)))/86400000));}}catch(e){}
+    return {l:l,days:days};
+  }).filter(function(x){return x.days>0;});
+  const rows=items.length?items.map(function(p){var l=p.l;var amt=p.days*rd(l);return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 text-slate-600">${l.ssl||""}</td><td class="px-4 py-3 text-slate-500">${l.lfd||""}</td><td class="px-4 py-3 tabular text-amber-600">${p.days}d</td><td class="px-4 py-3 tabular text-slate-800">${money(amt)}</td></tr>`;}).join(""):'<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No per-diem exposure detected.</td></tr>';
+  const exposure=items.reduce(function(a,p){return a+p.days*rd(p.l);},0);
+  const k=kpis([["Loads w/ per-diem",String(items.length),items.length?"text-amber-600":"text-emerald-600"],["Total exposure",money(exposure),"text-amber-600"],["Default rate/day",money((typeof rateGet==="function")?rateGet("perdiem_day"):150)]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="clock" class="h-4 w-4"></i> Containers past their per-diem free day \u2014 per-diem to recover or dispute.</div>${k}${panel("Per diem audit",tbl(["Load","Container","SSL","LFD","Days","Exposure"],rows))}</div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
   document.getElementById("pageTitle").textContent=cur.label;
   const c=document.getElementById("content");
   const map={
-    dispatch:mDispatch,planner:mPlanner,optimizer:mOptimizer,pulllist:mPullList,appointments:mAppointments,yard:mYard,
+    dispatch:mDispatch,problems:mProblemContainers,planner:mPlanner,optimizer:mOptimizer,pulllist:mPullList,appointments:mAppointments,yard:mYard,
     emailintake:mEmailIntake,
     streetturns:mStreetTurns,
     templates:mTemplates,
@@ -2858,12 +2962,12 @@ function render(){
     /* v2 — Customer */
     contractrates:mCustomerRates,quoteconvert:mQuoteConvert,credithold:mCreditHold,custapp:mCustApp,csat:mCsat,
     /* v2 — Insights */
-    execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
+    tracking:mTracking,reports:mReports,execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
     /* v2 — AI */
     demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
-    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
+    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
     roles:mRoles,
     settings:mSettings,
   };
