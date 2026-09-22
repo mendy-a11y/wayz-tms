@@ -350,6 +350,11 @@ const NAV = [
     {key:"arbooks",label:"Invoices (A/R)",icon:"file-text"},
     {key:"payments",label:"Payments",icon:"banknote"},
     {key:"statements",label:"Statements",icon:"mail"},
+    {key:"arbilling",label:"Billing",icon:"receipt"},
+    {key:"arinvoices",label:"Invoices",icon:"file-text"},
+    {key:"araging",label:"Aging",icon:"calendar-clock"},
+    {key:"arcollections",label:"Collections",icon:"alert-circle"},
+    {key:"arapply",label:"Apply Payments",icon:"banknote"},
     {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
     {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
     {key:"autoinvoice",label:"Auto-Invoicing",icon:"file-check-2"},
@@ -631,12 +636,15 @@ const LEG_ICON={
   blocked:'<i data-lucide="alert-triangle" class="h-5 w-5 text-red-500"></i>',
 };
 
+function setLoadTab(id,t){state.loadTab=t;openLoad(id);}
+window.setLoadTab=setLoadTab;
 function openLoad(id){
   const l=LOADS.find(x=>x.id===id);if(!l)return;
   try{l.legs=(l.legs&&l.legs.length)?l.legs:buildLegs(l,l.routing);}catch(e){l.legs=l.legs||[];}
   l.docs=l.docs||[];l.charges=l.charges||{};l.ref=l.ref||"";l.chassis=l.chassis||"—";
   if(l.charges.total==null)l.charges.total=(l.charges.base||0)+(l.charges.fuel||0)+(l.charges.demurrage||0)+(l.charges.perdiem||0);
   const lfd=l.lfd?lfdMeta(l.lfd):{cls:"text-slate-400",txt:"—"};
+  const LT=state.loadTab||"info";
   const fact=(lab,val,mono)=>`<div><div class="text-xs text-slate-500">${lab}</div><div class="text-sm text-slate-800 ${mono?'font-mono':''}">${val}</div></div>`;
   const row=(lab,val,warn)=>`<div class="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-0"><span class="${warn?'text-amber-700':'text-slate-600'}">${lab}</span><span class="tabular ${warn?'font-medium text-amber-700':'text-slate-800'}">${money(val)}</span></div>`;
   const el=document.getElementById("slideover");
@@ -651,8 +659,9 @@ function openLoad(id){
       </div>
       <button onclick="closeLoad()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><i data-lucide="x" class="h-5 w-5"></i></button>
     </div>
+    <div class="flex gap-1 overflow-x-auto border-b border-slate-200 px-4"><button onclick="setLoadTab('${l.id}','info')" class="whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${LT==='info'?'border-sky-500 text-slate-900':'border-transparent text-slate-500 hover:text-slate-800'}">Load Info</button><button onclick="setLoadTab('${l.id}','routing')" class="whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${LT==='routing'?'border-sky-500 text-slate-900':'border-transparent text-slate-500 hover:text-slate-800'}">Routing</button><button onclick="setLoadTab('${l.id}','billing')" class="whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${LT==='billing'?'border-sky-500 text-slate-900':'border-transparent text-slate-500 hover:text-slate-800'}">Billing</button><button onclick="setLoadTab('${l.id}','docs')" class="whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${LT==='docs'?'border-sky-500 text-slate-900':'border-transparent text-slate-500 hover:text-slate-800'}">Documents</button></div>
     <div class="flex-1 overflow-auto px-6 py-5">
-      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Container</h3>
+      ${LT==="info"?`      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Container</h3>
         <div class="grid grid-cols-2 gap-3">${fact("Container #",l.container,1)}${fact("Size / Type",l.size)}${fact("Steamship line",l.ssl)}${fact("MBL",l.mbl,1)}${fact("Chassis",l.chassis)}${fact("Terminal",l.terminal)}</div>
       </div>
       <div class="mb-6"><div class="mb-2 flex items-center gap-2"><h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Terminal status</h3><span class="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200"><i data-lucide="zap" class="h-3 w-3"></i> auto-scraped</span></div>
@@ -673,7 +682,8 @@ function openLoad(id){
         <button onclick="saveAppts('${l.id}')" class="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Save appointments</button>
         <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">${l.schedStatus==="to_send"?'<div class="text-xs text-slate-500">Queued — Ava will email the customer options shortly.</div>':l.schedStatus==="requested"?'<div class="text-xs text-slate-500">Ava emailed the customer — awaiting their reply.</div>':(l.schedStatus==="needs_approval"||l.schedStatus==="reschedule_requested")?`<div class="text-xs text-amber-700">Customer proposed <span class="font-medium">${fmtAppt(l.proposedSlot)}</span> — needs your approval. <button onclick="closeLoad();setActive('approvals')" class="font-medium underline">Review</button></div>`:l.schedStatus==="confirmed"?'<div class="text-xs text-emerald-600">Appointment confirmed with the customer.</div>':`<button onclick="openScheduleReq('${l.id}')" class="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"><i data-lucide="sparkles" class="h-3.5 w-3.5"></i> Have Ava request appointment</button>`}</div>
       </div>
-      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Routing</h3>
+`:""}
+      ${LT==="routing"?`      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Routing</h3>
         <div class="flex flex-wrap gap-2">${ROUTING.map(r=>`<button onclick="setRouting('${l.id}','${r}')" class="rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 transition ${l.routing===r?'bg-slate-900 text-white ring-slate-900':'bg-white text-slate-600 ring-slate-200 hover:ring-sky-400'}">${r}</button>`).join("")}</div>
         <div class="mt-2 flex items-center gap-1.5 text-xs ${l.routing==='1 Way'?'text-amber-600':'text-slate-500'}"><i data-lucide="${l.routing==='1 Way'?'alert-triangle':'anchor'}" class="h-3.5 w-3.5"></i> ${l.routing==='1 Way'?'One-way move — does not return to port.':`Ends at ${l.terminal} for empty return.`}</div>
       </div>
@@ -683,16 +693,19 @@ function openLoad(id){
           <div class="flex items-center gap-1.5 text-xs text-slate-500"><i data-lucide="map-pin" class="h-3 w-3"></i> ${leg.loc}</div>
           <div class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400"><i data-lucide="clock" class="h-3 w-3"></i> ${leg.eta}</div></div></li>`).join("")}</ol>
       </div>
-      ${accSection(l)}
-      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Documents</h3>
-        <div class="space-y-2">${l.docs.length===0?'<div class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">No documents attached yet.</div>':l.docs.map(d=>`<a href="${d.url||'#'}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 hover:border-sky-300 hover:bg-sky-50/40"><div class="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-slate-500"><i data-lucide="file-text" class="h-4 w-4"></i></div><div class="flex-1"><div class="text-sm font-medium text-slate-800">${d.type}</div><div class="truncate text-xs text-slate-400">${d.name}</div></div><i data-lucide="download" class="h-4 w-4 text-slate-400"></i></a>`).join("")}</div>
-        <div class="mt-3 flex flex-wrap gap-2">${DOC_TYPES.map(t=>`<button onclick="toast(&#39;${t} attach requested&#39;)" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-600"><i data-lucide="paperclip" class="h-3.5 w-3.5"></i> ${t}</button>`).join("")}</div>
-      </div>
+`:""}
+      ${LT==="billing"?`      ${accSection(l)}
       <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Billing summary</h3>
         <div class="rounded-lg border border-slate-200">${row("Line haul",l.charges.base)}${row("Fuel surcharge",l.charges.fuel)}${l.charges.demurrage>0?row("Demurrage",l.charges.demurrage,1):""}${l.charges.perdiem>0?row("Per diem",l.charges.perdiem,1):""}
           <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2.5"><span class="text-sm font-semibold text-slate-900">Total</span><span class="text-sm font-semibold tabular text-slate-900">${money(l.charges.total)}</span></div></div>
         <div class="mt-1 text-[11px] text-slate-400">Full drayage accessorial lingo (chassis split, pre-pull, yard storage, DblMove, etc.) to be added.</div>
       </div>
+`:""}
+      ${LT==="docs"?`      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Documents</h3>
+        <div class="space-y-2">${l.docs.length===0?'<div class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">No documents attached yet.</div>':l.docs.map(d=>`<a href="${d.url||'#'}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 hover:border-sky-300 hover:bg-sky-50/40"><div class="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-slate-500"><i data-lucide="file-text" class="h-4 w-4"></i></div><div class="flex-1"><div class="text-sm font-medium text-slate-800">${d.type}</div><div class="truncate text-xs text-slate-400">${d.name}</div></div><i data-lucide="download" class="h-4 w-4 text-slate-400"></i></a>`).join("")}</div>
+        <div class="mt-3 flex flex-wrap gap-2">${DOC_TYPES.map(t=>`<button onclick="toast(&#39;${t} attach requested&#39;)" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-600"><i data-lucide="paperclip" class="h-3.5 w-3.5"></i> ${t}</button>`).join("")}</div>
+      </div>
+`:""}
     </div>
     <div class="flex gap-2 border-t border-slate-200 px-6 py-3">
       ${(l.status==="delivered"||l.status==="completed")?'<div class="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 py-2.5 text-sm font-medium text-emerald-700"><i data-lucide="check-circle" class="h-4 w-4"></i> Delivered</div>':`<button onclick="openAssign('${l.id}')" class="flex-1 rounded-lg bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-800">Dispatch driver</button><button onclick="markDelivered('${l.id}')" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100">Mark delivered</button>`}
@@ -2069,22 +2082,27 @@ const DV_LOADS=[
   {id:"WZ-24817",container:"MSCU7841203",cust:"Atlantic Wholesale",terminal:"APM Elizabeth",dest:"Edison, NJ",routing:"Prepull-Live",appt:"2:30 PM",status:"Assigned",pay:210,legs:[{n:"Pull from APM Elizabeth",done:false},{n:"Yard — Wayz Newark",done:false},{n:"Live delivery — Edison, NJ",done:false},{n:"Return empty to port",done:false}],gate:"APM Elizabeth — customs + freight hold must clear before pickup."},
 ];
 const DV_PAY=[{id:"WZ-24788",lane:"APM → Edison",amt:210},{id:"WZ-24799",lane:"GCT → Newark",amt:185},{id:"WZ-24805",lane:"Maher → Newark",amt:185}];
-const dv={open:false,screen:"login",tab:"loads",load:null,pin:"",offline:false,syncQueue:[],docs:[],scanType:"POD",listening:false,chat:[{from:"disp",t:"Head to Maher for WZ-24805 — gate 3, booking # is in the app.",ts:"9:20"},{from:"me",t:"On my way, 10 out",ts:"9:22"}]};
+const dv={open:false,screen:"login",tab:"loads",load:null,driverName:null,pin:"",offline:false,syncQueue:[],docs:[],scanType:"POD",listening:false,chat:[{from:"disp",t:"Head to Maher for WZ-24805 — gate 3, booking # is in the app.",ts:"9:20"},{from:"me",t:"On my way, 10 out",ts:"9:22"}]};
 function dvNow(){try{return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});}catch(e){return "";}}
 function dvToggleOffline(){dv.offline=!dv.offline;if(!dv.offline&&dv.syncQueue.length){const n=dv.syncQueue.length;dv.syncQueue=[];toast("Back online — synced "+n+" update"+(n>1?"s":""));}else{toast(dv.offline?"Offline — updates will queue":"Back online");}renderDriverView();}
 function dvStatus(label){if(dv.offline){dv.syncQueue.push({label,ts:dvNow()});toast(label+" — saved offline");}else{toast(label+" — sent to dispatch");}renderDriverView();}
 function dvVoice(){dv.listening=true;renderDriverView();const finish=()=>{dv.listening=false;dvStatus("Arrived at terminal");};if(typeof setTimeout==="function")setTimeout(finish,1000);else finish();}
 function dvScanType(t){dv.scanType=t;renderDriverView();}
-function dvCapture(){const type=dv.scanType||"POD";const load=dv.load||DV_LOADS[0].id;dv.docs.unshift({type,load,ts:dvNow()});if(dv.offline)dv.syncQueue.push({label:type+" scan",ts:dvNow()});toast(type+" scanned — attached to "+load);renderDriverView();}
+function dvCapture(){const type=dv.scanType||"POD";const load=dv.load||"unassigned";dv.docs.unshift({type,load,ts:dvNow()});if(dv.offline)dv.syncQueue.push({label:type+" scan",ts:dvNow()});toast(type+" scanned — attached to "+load);renderDriverView();}
 function dvQuick(t){if(!t)return;dv.chat.push({from:"me",t,ts:dvNow()});renderDriverView();}
 function openDriverView(){dv.open=true;dv.screen="login";dv.tab="loads";dv.load=null;renderDriverView();}
 function closeDriverView(){dv.open=false;const el=document.getElementById("driverview");el.className="hidden";el.innerHTML="";}
 function dvScreen(s){dv.screen=s;renderDriverView();}
 function dvTab(t){dv.tab=t;dv.load=null;renderDriverView();}
 function dvOpen(id){dv.load=id;renderDriverView();}
-function dvKey(d){if(dv.pin.length<4)dv.pin+=d;if(dv.pin.length>=4){dv.screen="app";dv.pin="";}renderDriverView();}
+function dvKey(d){if(dv.pin.length<4)dv.pin+=d;if(dv.pin.length>=4){dvDoLogin();return;}renderDriverView();}
 function dvBack(){dv.pin=dv.pin.slice(0,-1);renderDriverView();}
-function dvSignIn(){dv.screen="app";dv.pin="";renderDriverView();}
+function dvDoLogin(){dv.driverName=val("dv_driver")||(DRIVERS[0]&&DRIVERS[0].name)||null;dv.screen="app";dv.pin="";renderDriverView();}
+function dvSignIn(){dvDoLogin();}
+function dvDriverLoads(){if(!dv.driverName)return [];return LOADS.filter(function(l){return l.driver===dv.driverName&&l.status!=="delivered"&&l.status!=="completed";});}
+function dvGroupByDate(loads){var g={};loads.forEach(function(l){var d=(l.meta&&l.meta.dispatchDate)||"unscheduled";(g[d]=g[d]||[]).push(l);});return g;}
+function dvDeliver(id){var l=LOADS.find(function(x){return x.id===id;});if(l){l.status="delivered";if(WZ.sb)wzUpsertLoad(l);}toast("Marked delivered — Penny will draft the invoice");dv.load=null;renderDriverView();if(typeof render==="function")render();}
+window.dvDeliver=dvDeliver;
 window.openDriverView=openDriverView;window.closeDriverView=closeDriverView;window.dvScreen=dvScreen;window.dvTab=dvTab;window.dvOpen=dvOpen;window.dvKey=dvKey;window.dvBack=dvBack;window.dvSignIn=dvSignIn;window.dvToggleOffline=dvToggleOffline;window.dvStatus=dvStatus;window.dvVoice=dvVoice;window.dvScanType=dvScanType;window.dvCapture=dvCapture;window.dvQuick=dvQuick;
 function dvLogin(){
   const dots=[0,1,2,3].map(i=>`<div class="flex h-11 flex-1 items-center justify-center rounded-xl bg-white/10 text-xl ${i<dv.pin.length?'text-sky-300':'text-slate-600'}">${i<dv.pin.length?'●':'○'}</div>`).join("");
@@ -2100,29 +2118,32 @@ function dvLogin(){
       <div class="mt-3 text-lg font-semibold">Wayz Driver</div>
       <div class="mt-1 text-xs text-slate-400">Enter your PIN to see your moves</div>
     </div>
-    <div class="mt-5"><label class="mb-1 block text-xs text-slate-400">Mobile number</label><div class="rounded-xl bg-white/10 px-4 py-3 text-sm">${DV_DRIVER.phone}</div></div>
+    <div class="mt-5"><label class="mb-1 block text-xs text-slate-400">Sign in as</label><select id="dv_driver" class="w-full rounded-xl bg-white/10 px-4 py-3 text-sm text-white">${DRIVERS.length?DRIVERS.map(function(d){return `<option value="${d.name}" ${dv.driverName===d.name?"selected":""}>${d.name}</option>`;}).join(""):'<option value="">No drivers yet</option>'}</select></div>
     <div class="mt-3"><label class="mb-1 block text-xs text-slate-400">PIN</label><div class="flex gap-2">${dots}</div></div>
     <div class="mt-4 grid grid-cols-3 gap-2">${pad}</div>
     <button onclick="dvSignIn()" class="mt-4 w-full rounded-xl bg-sky-500 py-3 text-sm font-semibold text-white active:bg-sky-600">Sign in</button>
     <div class="mt-3 text-center text-[11px] text-slate-500">Any 4 digits · Español · ਪੰਜਾਬੀ · Русский</div>
   </div>`;
 }
-function dvLoadMini(l){const st=l.status==="En route"?"bg-indigo-100 text-indigo-700":"bg-slate-100 text-slate-600";return `<button onclick="dvOpen('${l.id}')" class="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left active:bg-slate-50"><div class="flex items-center justify-between"><span class="text-sm font-semibold text-slate-900">${l.id}</span><span class="rounded-full px-2 py-0.5 text-[11px] font-medium ${st}">${l.status}</span></div><div class="mt-1 font-mono text-xs text-slate-500">${l.container}</div><div class="mt-2 flex items-center gap-1.5 text-xs text-slate-500"><i data-lucide="map-pin" class="h-3.5 w-3.5"></i> ${l.terminal} → ${l.dest}</div><div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-slate-400">Appt ${l.appt} · ${l.routing}</span><span class="font-semibold text-emerald-600">$${l.pay}</span></div></button>`;}
+function dvLoadMini(l){return `<button onclick="dvOpen('${l.id}')" class="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left active:bg-slate-50"><div class="flex items-center justify-between"><span class="text-sm font-semibold text-slate-900">${l.id}</span><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">${l.routing||""}</span></div><div class="mt-1 font-mono text-xs text-slate-500">${l.container||""}</div><div class="mt-2 flex items-center gap-1.5 text-xs text-slate-500"><i data-lucide="map-pin" class="h-3.5 w-3.5"></i> ${l.terminal||"—"} → ${l.consignee||"—"}</div><div class="mt-2 flex items-center justify-between text-[11px]"><span class="text-slate-400">${l.pickupAppt?("Pickup "+fmtAppt(l.pickupAppt)):(l.deliveryAppt?("Deliver "+fmtAppt(l.deliveryAppt)):"No appt set")}</span><span class="font-medium text-sky-600">${(l.meta&&l.meta.dispatchDate)?fmtDay(l.meta.dispatchDate):""}</span></div></button>`;}
 function dvLoadDetail(l){
-  const legs=l.legs.map((leg,i)=>`<div class="flex gap-3"><div class="flex flex-col items-center"><div class="flex h-5 w-5 items-center justify-center rounded-full ${leg.done?'bg-emerald-500 text-white':'border-2 border-slate-300 bg-white'}">${leg.done?'<i data-lucide="check" class="h-3 w-3"></i>':''}</div>${i<l.legs.length-1?'<div class="h-6 w-0.5 bg-slate-200"></div>':''}</div><div class="pb-4 text-sm ${leg.done?'text-slate-400 line-through':'text-slate-700'}">${leg.n}</div></div>`).join("");
-  const paper=["TIR In","POD","TIR Out"].map(x=>`<button onclick="dvScanType('${x}');dvTab('scan')" class="flex flex-col items-center gap-1 rounded-xl border border-dashed border-slate-300 py-3 text-[11px] text-slate-500 active:bg-slate-50"><i data-lucide="camera" class="h-4 w-4"></i> ${x}</button>`).join("");
-  return `<div class="px-4 pt-3"><button onclick="dvTab('loads')" class="mb-2 flex items-center gap-1 text-xs text-slate-500"><i data-lucide="chevron-left" class="h-4 w-4"></i> Today</button>
-    <div class="mb-3 rounded-2xl p-4 text-white" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)"><div class="flex items-center justify-between"><div><div class="text-xs opacity-80">This move pays</div><div class="text-3xl font-semibold" style="font-family:var(--font-display)">$${l.pay}</div></div><div class="text-right text-[11px] opacity-90">Base $${l.pay}<br>+ detention / prepull as earned</div></div></div>
-    <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="flex items-center justify-between"><span class="text-base font-semibold text-slate-900">${l.id}</span><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">${l.routing}</span></div><div class="mt-1 font-mono text-xs text-slate-500">${l.container} · ${l.cust}</div><div class="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><i data-lucide="info" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><span>${l.gate}</span></div><div class="mt-4">${legs}</div></div>
-    <div class="mt-3 grid grid-cols-2 gap-2"><button onclick="dvStatus('Arrived at terminal')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Arrived at terminal</button><button onclick="dvStatus('Delivered')" class="rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 active:bg-slate-50">Mark delivered</button></div>
+  var pay=(typeof loadDriverPay==="function"?(loadDriverPay(l)||0):0);
+  var legs=[{n:"Pull from "+(l.terminal||"terminal")},{n:(l.type==="EXP"?"Load at ":"Deliver to ")+(l.consignee||"customer")},{n:"Return empty"}];
+  var legsHtml=legs.map(function(leg,i){return `<div class="flex gap-3"><div class="flex flex-col items-center"><div class="h-5 w-5 rounded-full border-2 border-slate-300 bg-white"></div>${i<legs.length-1?'<div class="h-6 w-0.5 bg-slate-200"></div>':''}</div><div class="pb-4 text-sm text-slate-700">${leg.n}</div></div>`;}).join("");
+  var paper=["TIR In","POD","TIR Out"].map(function(x){return `<button onclick="dvScanType('${x}');dvTab('scan')" class="flex flex-col items-center gap-1 rounded-xl border border-dashed border-slate-300 py-3 text-[11px] text-slate-500 active:bg-slate-50"><i data-lucide="camera" class="h-4 w-4"></i> ${x}</button>`;}).join("");
+  var note=(l.holds&&l.holds.length)?("Holds to clear: "+l.holds.join(", ")):"Have booking # and TWIC ready at the terminal.";
+  return `<div class="px-4 pt-3"><button onclick="dvTab('loads')" class="mb-2 flex items-center gap-1 text-xs text-slate-500"><i data-lucide="chevron-left" class="h-4 w-4"></i> My moves</button>
+    <div class="mb-3 rounded-2xl p-4 text-white" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)"><div class="flex items-center justify-between"><div><div class="text-xs opacity-80">This move pays</div><div class="text-3xl font-semibold" style="font-family:var(--font-display)">$${pay}</div></div><div class="text-right text-[11px] opacity-90">${(l.meta&&l.meta.dispatchDate)?fmtDay(l.meta.dispatchDate):"Not scheduled"}<br>${l.pickupAppt?("Pickup "+fmtAppt(l.pickupAppt)):""}</div></div></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="flex items-center justify-between"><span class="text-base font-semibold text-slate-900">${l.id}</span><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">${l.routing||""}</span></div><div class="mt-1 font-mono text-xs text-slate-500">${l.container||""} · ${l.customer||""}</div><div class="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><i data-lucide="info" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><span>${note}</span></div><div class="mt-4">${legsHtml}</div></div>
+    <div class="mt-3 grid grid-cols-2 gap-2"><button onclick="dvStatus('Arrived at terminal')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Arrived at terminal</button><button onclick="dvDeliver('${l.id}')" class="rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 active:bg-slate-50">Mark delivered</button></div>
     <button onclick="dvVoice()" class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-xs font-semibold active:bg-slate-50 ${dv.listening?'border-sky-400 bg-sky-50 text-sky-700':'border-slate-200 bg-white text-slate-700'}"><i data-lucide="mic" class="h-4 w-4"></i> ${dv.listening?'Listening…':'Hands-free status'}</button>
     <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-4"><div class="text-xs font-semibold text-slate-800">Paperwork</div><div class="mt-2 grid grid-cols-3 gap-2">${paper}</div></div></div>`;
 }
 function dvApp(){
   const pend=dv.syncQueue.length;
   let body="";
-  if(dv.load){body=dvLoadDetail(DV_LOADS.find(l=>l.id===dv.load));}
-  else if(dv.tab==="loads"){body=`<div class="px-4 pt-3"><div class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Today · ${DV_LOADS.length} moves</div><div class="space-y-3">${DV_LOADS.map(dvLoadMini).join("")}</div></div>`;}
+  if(dv.load){var _rl=LOADS.find(function(l){return l.id===dv.load;});body=_rl?dvLoadDetail(_rl):'<div class="p-6 text-center text-sm text-slate-400">Load not found</div>';}
+  else if(dv.tab==="loads"){var _loads=dvDriverLoads();if(!_loads.length){body='<div class="px-4 pt-8 text-center text-sm text-slate-400">No moves assigned'+(dv.driverName?(" to "+dv.driverName):"")+" yet.</div>";}else{var _g=dvGroupByDate(_loads);var _keys=Object.keys(_g).sort();body='<div class="space-y-4 px-4 pt-3">'+_keys.map(function(d){var lbl=d==="unscheduled"?"Unscheduled":fmtDay(d);return '<div><div class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">'+lbl+" · "+_g[d].length+" move"+(_g[d].length>1?"s":"")+'</div><div class="space-y-3">'+_g[d].map(dvLoadMini).join("")+"</div></div>";}).join("")+"</div>";}}
   else if(dv.tab==="scan"){
     const types=["TIR In","POD","TIR Out","BOL"];
     const chips=types.map(t=>`<button onclick="dvScanType('${t}')" class="rounded-full px-3 py-1.5 text-xs font-medium ${(dv.scanType||'POD')===t?'bg-sky-500 text-white':'bg-slate-100 text-slate-600'}">${t}</button>`).join("");
@@ -2146,7 +2167,7 @@ function dvApp(){
   else{body=`<div class="px-4 pt-3"><div class="rounded-2xl border border-slate-200 bg-white p-4 text-center"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-white">RA</div><div class="mt-2 text-sm font-semibold text-slate-900">${DV_DRIVER.name}</div><div class="text-xs text-slate-500">Truck ${DV_DRIVER.truck} · ${DV_DRIVER.phone}</div></div><div class="mt-3 rounded-2xl border border-slate-200 bg-white p-4"><div class="text-xs font-semibold text-slate-800">Document wallet</div><div class="mt-2 space-y-2 text-sm"><div class="flex items-center justify-between"><span class="text-slate-600">CDL</span><span class="text-xs text-emerald-600">valid · 2027-04</span></div><div class="flex items-center justify-between"><span class="text-slate-600">TWIC</span><span class="text-xs text-amber-600">expires 2026-10</span></div><div class="flex items-center justify-between"><span class="text-slate-600">Medical card</span><span class="text-xs text-amber-600">expires 2026-09</span></div></div></div><button onclick="dvScreen('login')" class="mt-3 w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-red-600 active:bg-slate-50">Sign out</button></div>`;}
   const tab=(k,icon,label)=>`<button onclick="dvTab('${k}')" class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] ${dv.tab===k&&!dv.load?'text-sky-600':'text-slate-400'}"><i data-lucide="${icon}" class="h-5 w-5"></i>${label}</button>`;
   const off=`<button onclick="dvToggleOffline()" class="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${dv.offline?'bg-amber-100 text-amber-700':'bg-emerald-50 text-emerald-700'}"><i data-lucide="${dv.offline?'wifi-off':'wifi'}" class="h-3.5 w-3.5"></i>${dv.offline?'Offline':'Online'}${pend?' · '+pend:''}</button>`;
-  return `<div class="flex h-full flex-col bg-slate-50"><div class="flex items-center justify-between px-4 pb-3 pt-5"><div><div class="text-lg font-semibold text-slate-900">Hi, ${DV_DRIVER.first}</div><div class="text-xs text-slate-500">${DV_LOADS.length} moves today · Truck ${DV_DRIVER.truck}</div></div><div class="flex items-center gap-2">${off}<div class="relative"><i data-lucide="bell" class="h-5 w-5 text-slate-400"></i><span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500"></span></div></div></div><div class="phone-scroll flex-1 overflow-y-auto pb-2">${body}</div><div class="flex border-t border-slate-200 bg-white">${tab("loads","truck","Loads")}${tab("scan","camera","Scan")}${tab("pay","banknote","Pay")}${tab("chat","message-square","Chat")}${tab("profile","user","Profile")}</div></div>`;
+  return `<div class="flex h-full flex-col bg-slate-50"><div class="flex items-center justify-between px-4 pb-3 pt-5"><div><div class="text-lg font-semibold text-slate-900">Hi, ${(dv.driverName||"Driver").split(" ")[0]}</div><div class="text-xs text-slate-500">${dvDriverLoads().length} move${dvDriverLoads().length===1?"":"s"} · ${dv.driverName||""}</div></div><div class="flex items-center gap-2">${off}<div class="relative"><i data-lucide="bell" class="h-5 w-5 text-slate-400"></i><span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500"></span></div></div></div><div class="phone-scroll flex-1 overflow-y-auto pb-2">${body}</div><div class="flex border-t border-slate-200 bg-white">${tab("loads","truck","Loads")}${tab("scan","camera","Scan")}${tab("pay","banknote","Pay")}${tab("chat","message-square","Chat")}${tab("profile","user","Profile")}</div></div>`;
 }
 function renderDriverView(){
   const el=document.getElementById("driverview");if(!el)return;
@@ -2746,6 +2767,58 @@ function setPlanDate(d){state.planDate=d;render();}
 function planShift(n){var d=new Date((state.planDate||wzToday())+"T00:00");d.setDate(d.getDate()+n);state.planDate=d.toISOString().slice(0,10);render();}
 window.setPlanDate=setPlanDate;window.planShift=planShift;
 
+/* ================= ACCOUNTS RECEIVABLE ================= */
+function arReady(){const s=pennyState();if(WZ.sb&&!s.loaded)pennyLoad();return s.inv||[];}
+function invAge(i){var d=i.issued_at||i.created_at;if(!d)return 0;try{return Math.max(0,Math.round((new Date()-new Date(d))/86400000));}catch(e){return 0;}}
+function setArTab(t){state.arTab=t;render();}window.setArTab=setArTab;
+async function invPay(id){if(WZ.sb){try{await WZ.sb.from("invoices").update({status:"paid"}).eq("id",id);}catch(e){}}(pennyState().inv||[]).forEach(function(i){if(i.id===id)i.status="paid";});toast("Payment applied");render();}
+window.invPay=invPay;
+function arStatusBadge(s){const c={draft:"bg-slate-100 text-slate-600",approved:"bg-blue-50 text-blue-700",sent:"bg-amber-50 text-amber-700",paid:"bg-emerald-50 text-emerald-700",void:"bg-red-50 text-red-700"}[s]||"bg-slate-100 text-slate-600";return `<span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${c}">${s||"draft"}</span>`;}
+
+function mARBilling(){
+  const inv=arReady();const byLoad={};inv.forEach(function(i){if(i.load_id)byLoad[i.load_id]=i;});
+  const ready=LOADS.filter(function(l){return l.status==="delivered"||l.status==="completed";});
+  const rows=ready.length?ready.map(function(l){const i=byLoad[l.id];const badge=i?arStatusBadge(i.status):'<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">not billed</span>';return `<tr class="hover:bg-slate-50"><td class="cursor-pointer px-4 py-3 font-medium text-sky-700" onclick="openLoad('${l.id}')">${l.id}</td><td class="px-4 py-3 text-slate-700">${l.customer||""}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 tabular text-slate-700">${money(accTotal(l))}</td><td class="px-4 py-3">${badge}</td><td class="px-4 py-3 text-right">${i?"":`<button onclick="invCreate('${l.id}')" class="wz-btn-brand rounded-md px-2.5 py-1.5 text-[11px] font-semibold">Create invoice</button>`}</td></tr>`;}).join(""):'<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No delivered loads awaiting billing.</td></tr>';
+  const k=kpis([["Delivered loads",String(ready.length)],["Awaiting billing",String(ready.filter(function(l){return !byLoad[l.id];}).length),ready.filter(function(l){return !byLoad[l.id];}).length?"text-amber-600":"text-emerald-600"],["Billed",String(ready.filter(function(l){return byLoad[l.id];}).length),"text-emerald-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="receipt" class="h-4 w-4"></i> Delivered loads ready to invoice \u2014 Penny drafts these automatically.</div>${k}${panel("Billing queue",tbl(["Load","Customer","Container","Charges","Status",""],rows))}</div>`;
+}
+function mARInvoices(){
+  const inv=arReady();const t=state.arTab||"all";
+  const filt=inv.filter(function(i){return t==="all"?true:(t==="open"?(i.status!=="paid"&&i.status!=="void"):i.status===t);});
+  const tabs=[["all","All"],["draft","Draft"],["sent","Sent"],["paid","Paid"],["open","Open"]];
+  const rows=filt.length?filt.map(function(i){return `<tr class="cursor-pointer hover:bg-slate-50" onclick="invPreview('${i.id}')"><td class="px-4 py-3 font-medium text-slate-800">${i.number||i.id}</td><td class="px-4 py-3 text-slate-700">${i.customer_name||""}</td><td class="px-4 py-3 text-slate-500">${i.load_id||""}</td><td class="px-4 py-3 tabular text-slate-800">${money(i.total)}</td><td class="px-4 py-3">${arStatusBadge(i.status)}</td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No invoices.</td></tr>';
+  const open=inv.reduce(function(a,i){return a+((i.status==="paid"||i.status==="void")?0:(Number(i.total)||0));},0);
+  const k=kpis([["Invoices",String(inv.length)],["Open A/R",money(open),"text-amber-600"],["Paid",String(inv.filter(function(i){return i.status==="paid";}).length),"text-emerald-600"]]);
+  return `<div class="p-6">${k}<div class="mb-3 flex w-max items-center gap-1 rounded-lg bg-slate-100 p-1">${tabs.map(function(x){return `<button onclick="setArTab('${x[0]}')" class="rounded-md px-3 py-1.5 text-sm font-medium ${t===x[0]?'bg-white text-slate-900 shadow-sm':'text-slate-500 hover:text-slate-800'}">${x[1]}</button>`;}).join("")}</div>${panel("Invoices",tbl(["Invoice #","Customer","Load","Amount","Status"],rows))}</div>`;
+}
+function mARAging(){
+  const inv=arReady().filter(function(i){return i.status!=="paid"&&i.status!=="void";});
+  const AGE=["Current","1-30","31-60","61-90","90+"];
+  function bk(d){if(d<=0)return 0;if(d<=30)return 1;if(d<=60)return 2;if(d<=90)return 3;return 4;}
+  const by={};inv.forEach(function(i){var b=bk(invAge(i));var c=i.customer_name||"(unknown)";by[c]=by[c]||[0,0,0,0,0];by[c][b]+=Number(i.total)||0;});
+  const parties=Object.keys(by);
+  const rows=parties.length?parties.map(function(c){var b=by[c];var tot=b.reduce(function(a,x){return a+x;},0);return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">${c}</td>${b.map(function(v,i){return `<td class="px-4 py-3 text-right tabular ${v&&i>=3?'text-red-600':v&&i>=2?'text-amber-600':v?'text-slate-700':'text-slate-300'}">${v?money(v):'-'}</td>`;}).join("")}<td class="px-4 py-3 text-right tabular font-semibold text-slate-900">${money(tot)}</td></tr>`;}).join(""):'<tr><td colspan="7" class="px-4 py-8 text-center text-sm text-slate-400">No open A/R.</td></tr>';
+  const totalAr=inv.reduce(function(a,i){return a+(Number(i.total)||0);},0);
+  const over=inv.filter(function(i){return invAge(i)>60;}).reduce(function(a,i){return a+(Number(i.total)||0);},0);
+  const k=kpis([["Total A/R",money(totalAr)],["Over 60 days",money(over),over?"text-red-600":"text-slate-900"],["Open invoices",String(inv.length)]]);
+  const head=["Customer"].concat(AGE).concat(["Total"]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="calendar-clock" class="h-4 w-4"></i> Who owes you, by age.</div>${k}${panel("A/R aging",`<table class="wz-tbl w-full text-sm"><thead><tr>${head.map(function(h,i){return `<th class="${i?'text-right':''}">${h}</th>`;}).join("")}</tr></thead><tbody>${rows}</tbody></table>`)}</div>`;
+}
+function mARCollections(){
+  const inv=arReady().filter(function(i){return i.status==="sent"&&invAge(i)>(Number(i.terms_days)||30);});
+  const rows=inv.length?inv.map(function(i){var over=invAge(i)-(Number(i.terms_days)||30);return `<tr class="hover:bg-slate-50"><td class="cursor-pointer px-4 py-3 font-medium text-slate-800" onclick="invPreview('${i.id}')">${i.number||i.id}</td><td class="px-4 py-3 text-slate-700">${i.customer_name||""}</td><td class="px-4 py-3 tabular text-slate-800">${money(i.total)}</td><td class="px-4 py-3 text-right"><span class="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">${over}d overdue</span></td><td class="px-4 py-3 text-right"><button onclick="remApprove('${i.id}')" class="rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-semibold text-white">Send reminder</button></td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">Nothing overdue \u2014 nice.</td></tr>';
+  const k=kpis([["Overdue invoices",String(inv.length),inv.length?"text-red-600":"text-emerald-600"],["At risk",money(inv.reduce(function(a,i){return a+(Number(i.total)||0);},0)),inv.length?"text-red-600":"text-slate-900"],["Chased by","Penny"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="alert-circle" class="h-4 w-4"></i> Past-due invoices \u2014 approve a reminder and Penny emails the customer.</div>${k}${panel("Collections",tbl(["Invoice","Customer","Amount","Overdue",""],rows))}</div>`;
+}
+function mARApply(){
+  const inv=arReady().filter(function(i){return i.status==="sent";});
+  const rows=inv.length?inv.map(function(i){return `<tr class="hover:bg-slate-50"><td class="cursor-pointer px-4 py-3 font-medium text-slate-800" onclick="invPreview('${i.id}')">${i.number||i.id}</td><td class="px-4 py-3 text-slate-700">${i.customer_name||""}</td><td class="px-4 py-3 tabular text-slate-800">${money(i.total)}</td><td class="px-4 py-3 text-right"><button onclick="invPay('${i.id}')" class="wz-btn-brand rounded-md px-2.5 py-1.5 text-[11px] font-semibold">Apply payment</button></td></tr>`;}).join(""):'<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No open invoices.</td></tr>';
+  const open=inv.reduce(function(a,i){return a+(Number(i.total)||0);},0);
+  const paid=arReady().filter(function(i){return i.status==="paid";}).reduce(function(a,i){return a+(Number(i.total)||0);},0);
+  const k=kpis([["Open invoices",String(inv.length)],["Open A/R",money(open),"text-amber-600"],["Collected",money(paid),"text-emerald-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="banknote" class="h-4 w-4"></i> Apply a customer payment to close out an invoice.</div>${k}${panel("Apply payments & credits",tbl(["Invoice","Customer","Amount",""],rows))}</div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2790,7 +2863,7 @@ function render(){
     demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
-    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
+    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
     roles:mRoles,
     settings:mSettings,
   };
