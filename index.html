@@ -344,13 +344,18 @@ const NAV = [
   {section:"OTR",items:[
     {key:"otr",label:"OTR / FTL",icon:"truck"},
   ]},
+  {section:"Employees",items:[
+    {key:"employees",label:"Overview",icon:"users"},
+    {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
+    {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
+    {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
+    {key:"approvals",label:"Ava Approvals",icon:"check-check"},
+  ]},
   {section:"AI",items:[
     {key:"ai",label:"AI Ops Assistant",icon:"sparkles"},
     {key:"demurrageai",label:"Demurrage Predictor",icon:"sparkles",tag:1},
     {key:"driveraiengine",label:"AI Load Matching",icon:"cpu",tag:1},
     {key:"nlreports",label:"Ask Your Data",icon:"message-circle",tag:1},
-    {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
-    {key:"approvals",label:"Ava Approvals",icon:"check-check"},
   ]},
   {section:"AR",items:[
     {key:"arbilling",label:"Billing",icon:"receipt"},
@@ -364,7 +369,6 @@ const NAV = [
     {key:"disputes",label:"Disputes",icon:"scale"},
     {key:"creditmemos",label:"Credit Memos",icon:"credit-card"},
     {key:"arapply",label:"Apply Payments",icon:"banknote"},
-    {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
   ]},
   {section:"AP",items:[
     {key:"apdriverpay",label:"Driver Pay",icon:"banknote"},
@@ -378,7 +382,6 @@ const NAV = [
     {key:"arbooks",label:"Invoices (A/R)",icon:"file-text"},
     {key:"payments",label:"Payments",icon:"banknote"},
     {key:"statements",label:"Statements",icon:"mail"},
-    {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
     {key:"autoinvoice",label:"Auto-Invoicing",icon:"file-check-2"},
     {key:"batchinvoice",label:"Batch Invoicing",icon:"files"},
     {key:"apbills",label:"Bills (A/P)",icon:"file-input"},
@@ -2223,6 +2226,9 @@ function renderDriverView(){
 /* ---------------- RENDER ---------------- */
 const TAB_BADGE={streetturns:2,watchlist:5};
 function sectionTabs(sec){
+  if(sec.items.length>8){
+    return `<div class="wz-subnav"><select onchange="setActive(this.value)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-sky-400">`+sec.items.map(function(it){var b=TAB_BADGE[it.key];return `<option value="${it.key}" ${state.active===it.key?"selected":""}>${it.label}${(b!=null&&b>0)?(" ("+b+")"):""}</option>`;}).join("")+`</select></div>`;
+  }
   return `<div class="wz-subnav">`+sec.items.map(it=>{
     const on=state.active===it.key;const b=TAB_BADGE[it.key];
     return `<button onclick="setActive('${it.key}')" class="wz-subtab ${on?'wz-subtab-on':''}">${it.label}${b!=null?`<span class="wz-badge ${b>0?'wz-badge-amber':'wz-badge-green'}">${b}</span>`:''}</button>`;
@@ -2232,6 +2238,7 @@ const SECTION_HUBS=[
   {section:"Operations",label:"Operations",icon:"truck",land:"dispatch"},
   {section:"Assets",label:"Assets & Equipment",icon:"warehouse",land:"chassis"},
   {section:"Drivers",label:"Drivers",icon:"users",land:"drivers"},
+  {section:"Employees",label:"Wayz Employees",icon:"bot",land:"employees"},
   {section:"Sales",label:"Sales",icon:"trending-up",land:"contractrates"},
   {section:"CustomerService",label:"Customer Service",icon:"users",land:"custservice"},
   {section:"Integrations",label:"Integrations",icon:"plug",land:"integrations"},
@@ -3008,6 +3015,19 @@ function mCreditMemos(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="credit-card" class="h-4 w-4"></i> Credit memos issued to customers.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Credit memos",tbl(["Date","Customer","Amount","Reason"],rows))}</div>${add}</div></div>`;
 }
 
+/* ================= WAYZ EMPLOYEES (Ava + Penny) ================= */
+function mEmployees(){
+  const inv=(typeof arReady==="function")?arReady():[];
+  const avaApprovals=LOADS.filter(function(l){return l.schedStatus==="needs_approval"||l.schedStatus==="reschedule_requested";}).length;
+  const pennyInvoices=inv.filter(function(i){return i.status==="draft";}).length;
+  const pennyReminders=inv.filter(function(i){return i.reminder_status==="draft";}).length;
+  function card(name,role,color,tasks,links){return `<div class="wz-card p-5"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-white" style="background:${color}">${name.charAt(0)}</div><div><div class="text-sm font-semibold text-slate-900">${name}</div><div class="text-xs text-slate-500">${role}</div></div></div><div class="mt-4 space-y-2">${tasks.map(function(t){return `<div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span class="text-slate-600">${t[0]}</span><span class="rounded-full px-2 py-0.5 text-xs font-medium ${t[1]>0?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'}">${t[1]}</span></div>`;}).join("")}</div><div class="mt-4 flex flex-wrap gap-2">${links.map(function(x){return `<button onclick="setActive('${x[1]}')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">${x[0]}</button>`;}).join("")}</div></div>`;}
+  return `<div class="p-6"><div class="mb-4 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="bot" class="h-4 w-4"></i> Your AI employees \u2014 what they\u2019re handling and what needs you.</div><div class="grid gap-4 md:grid-cols-2">
+    ${card("Ava","Front office \u00b7 orders & scheduling","#0ea5e9",[["Appointments needing approval",avaApprovals]],[["Ava Approvals","approvals"],["Ava\u2019s Memory","avamemory"]])}
+    ${card("Penny","Back office \u00b7 billing & AR","#10b981",[["Invoices to approve",pennyInvoices],["Reminders to approve",pennyReminders]],[["Penny\u2019s Desk","pennydesk"],["Penny\u2019s Memory","pennymemory"]])}
+  </div></div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -3049,7 +3069,7 @@ function render(){
     /* v2 — Insights */
     tracking:mTracking,reports:mReports,execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
     /* v2 — AI */
-    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,
+    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,employees:mEmployees,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
     books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,chassisaudit:mChassisAudit,waitingaudit:mWaitingTimeAudit,disputes:mDisputes,creditmemos:mCreditMemos,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
