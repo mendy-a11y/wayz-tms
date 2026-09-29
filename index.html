@@ -220,6 +220,7 @@ button:active{transform:scale(.97)}
         <input oninput="doSearch(this.value)" placeholder="Search loads, containers, MBL, customers…" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-500/20" />
       </div>
       <div class="ml-auto flex items-center gap-1.5">
+        <select onchange="setRole(this.value)" title="View as role" class="mr-1 hidden rounded-xl border border-slate-200 bg-white/60 px-2 py-2 text-xs text-slate-600 lg:block"><option value="admin">Admin (all)</option><option value="dispatcher">Dispatcher</option><option value="billing">Billing / AR-AP</option><option value="sales">Sales</option><option value="ops_manager">Ops Manager</option></select>
         <div class="mr-1 hidden items-center gap-2 rounded-xl border border-slate-200 bg-white/60 px-3 py-2 text-xs text-slate-500 lg:flex"><span id="wzConn" class="wz-off"></span><span id="wzClock" class="wz-clock">—</span></div>
         <button onclick="toggleTheme()" title="Toggle theme" class="wz-icon-btn rounded-xl p-2.5"><i id="themeIconTop" data-lucide="moon" class="h-[18px] w-[18px]"></i></button>
         <button onclick="setActive('notifications')" class="wz-icon-btn relative rounded-xl p-2.5">
@@ -303,16 +304,19 @@ const NAV = [
     {key:"settlements",label:"Settlements",icon:"wallet"},
     {key:"scorecards",label:"Scorecards",icon:"gauge"},
   ]},
-  {section:"Customer",items:[
+  {section:"CustomerService",items:[
+    {key:"custservice",label:"Overview",icon:"users"},
     {key:"customers",label:"Customer Portal",icon:"building-2"},
-    {key:"contractrates",label:"Customer Rates",icon:"file-text"},
-    {key:"ratecards",label:"Rate Cards",icon:"upload"},
-    {key:"quoteconvert",label:"Quote Conversion",icon:"trending-up"},
     {key:"credithold",label:"Credit Holds",icon:"lock"},
     {key:"custapp",label:"Customer App",icon:"smartphone"},
     {key:"csat",label:"Satisfaction",icon:"star"},
-    {key:"quotes",label:"Quotes",icon:"badge-dollar-sign"},
     {key:"notifications",label:"Notifications",icon:"bell-ring"},
+  ]},
+  {section:"Sales",items:[
+    {key:"contractrates",label:"Customer Rates",icon:"file-text"},
+    {key:"ratecards",label:"Rate Cards",icon:"upload"},
+    {key:"quoteconvert",label:"Quote Conversion",icon:"trending-up"},
+    {key:"quotes",label:"Quotes",icon:"badge-dollar-sign"},
   ]},
   {section:"Integrations",items:[
     {key:"ocean",label:"Ocean Tracking",icon:"ship",tag:1},
@@ -355,6 +359,10 @@ const NAV = [
     {key:"arcollections",label:"Collections",icon:"alert-circle"},
     {key:"billingexc",label:"Billing Exceptions",icon:"circle-alert"},
     {key:"perdiemaudit",label:"Per Diem Audit",icon:"clock"},
+    {key:"chassisaudit",label:"Chassis Audit",icon:"link"},
+    {key:"waitingaudit",label:"Waiting Time Audit",icon:"clock"},
+    {key:"disputes",label:"Disputes",icon:"scale"},
+    {key:"creditmemos",label:"Credit Memos",icon:"credit-card"},
     {key:"arapply",label:"Apply Payments",icon:"banknote"},
     {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
   ]},
@@ -560,9 +568,24 @@ function setActive(k){state.active=k;state.navOpen=state.navOpen||{};const sec=N
 function setTab(t){state.tab=t;render();}
 window.setActive=setActive;window.setTab=setTab;
 
+/* ================= ROLES & PERMISSIONS ================= */
+const ROLE_ACCESS={
+  admin:["*"],
+  dispatcher:["Operations","Assets","Drivers","Tracking","OTR","AI"],
+  billing:["AR","AP","Wayz Books","CustomerService","Insights"],
+  sales:["Sales","CustomerService","Insights"],
+  ops_manager:["Operations","Assets","Drivers","Tracking","OTR","Insights","AI","CustomerService"]
+};
+const ROLE_LABELS={admin:"Admin (all)",dispatcher:"Dispatcher",billing:"Billing / AR-AP",sales:"Sales",ops_manager:"Ops Manager"};
+function curRole(){if(!state.role){try{state.role=localStorage.getItem("wz_role")||"admin";}catch(e){state.role="admin";}}return state.role;}
+function roleCan(section){var a=ROLE_ACCESS[curRole()]||["*"];return a.indexOf("*")>=0||a.indexOf(section)>=0;}
+function allowedHubs(){return SECTION_HUBS.filter(function(h){return roleCan(h.section);});}
+function setRole(r){state.role=r;try{localStorage.setItem("wz_role",r);}catch(e){}var hubs=allowedHubs();var okSection=(NAV.find(function(s){return s.items.some(function(i){return i.key===state.active;});})||{}).section;if(!roleCan(okSection)&&hubs.length){setActive(hubs[0].land);return;}render();}
+window.setRole=setRole;
+
 /* ---------------- NAV ---------------- */
 function renderNav(){
-  document.getElementById("nav").innerHTML=SECTION_HUBS.map(h=>{
+  document.getElementById("nav").innerHTML=allowedHubs().map(h=>{
     const on=(NAV.find(s=>s.section===h.section)||{items:[]}).items.some(i=>i.key===state.active);
     return `<button onclick="setActive('${h.land}')" class="nav-link relative flex w-full items-center gap-3 py-2.5 pl-3 pr-2 text-sm ${on?'wz-on':''}">${on?'<span class="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-sky-400"></span>':''}<i data-lucide="${h.icon}" class="h-[18px] w-[18px] ${on?'text-sky-400':'text-slate-400'}"></i><span class="flex-1 text-left">${h.label}</span></button>`;
   }).join("");
@@ -2117,6 +2140,9 @@ function dvDriverLoads(){if(!dv.driverName)return [];return LOADS.filter(functio
 function dvGroupByDate(loads){var g={};loads.forEach(function(l){var d=(l.meta&&l.meta.dispatchDate)||"unscheduled";(g[d]=g[d]||[]).push(l);});return g;}
 function dvDeliver(id){var l=LOADS.find(function(x){return x.id===id;});if(l){l.status="delivered";if(WZ.sb)wzUpsertLoad(l);}toast("Marked delivered — Penny will draft the invoice");dv.load=null;renderDriverView();if(typeof render==="function")render();}
 window.dvDeliver=dvDeliver;
+function dvArrive(id){var l=LOADS.find(function(x){return x.id===id;});if(l){l.meta=l.meta||{};l.meta.dates=l.meta.dates||{};l.meta.dates.arrived=new Date().toISOString().slice(0,16);if(WZ.sb)wzUpsertLoad(l);}toast("Arrival logged");renderDriverView();}
+function dvDepart(id){var l=LOADS.find(function(x){return x.id===id;});if(l){l.meta=l.meta||{};l.meta.dates=l.meta.dates||{};l.meta.dates.departed=new Date().toISOString().slice(0,16);if(WZ.sb)wzUpsertLoad(l);}toast("Departure logged");renderDriverView();}
+window.dvArrive=dvArrive;window.dvDepart=dvDepart;
 window.openDriverView=openDriverView;window.closeDriverView=closeDriverView;window.dvScreen=dvScreen;window.dvTab=dvTab;window.dvOpen=dvOpen;window.dvKey=dvKey;window.dvBack=dvBack;window.dvSignIn=dvSignIn;window.dvToggleOffline=dvToggleOffline;window.dvStatus=dvStatus;window.dvVoice=dvVoice;window.dvScanType=dvScanType;window.dvCapture=dvCapture;window.dvQuick=dvQuick;
 function dvLogin(){
   const dots=[0,1,2,3].map(i=>`<div class="flex h-11 flex-1 items-center justify-center rounded-xl bg-white/10 text-xl ${i<dv.pin.length?'text-sky-300':'text-slate-600'}">${i<dv.pin.length?'●':'○'}</div>`).join("");
@@ -2149,7 +2175,7 @@ function dvLoadDetail(l){
   return `<div class="px-4 pt-3"><button onclick="dvTab('loads')" class="mb-2 flex items-center gap-1 text-xs text-slate-500"><i data-lucide="chevron-left" class="h-4 w-4"></i> My moves</button>
     <div class="mb-3 rounded-2xl p-4 text-white" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)"><div class="flex items-center justify-between"><div><div class="text-xs opacity-80">This move pays</div><div class="text-3xl font-semibold" style="font-family:var(--font-display)">$${pay}</div></div><div class="text-right text-[11px] opacity-90">${(l.meta&&l.meta.dispatchDate)?fmtDay(l.meta.dispatchDate):"Not scheduled"}<br>${l.pickupAppt?("Pickup "+fmtAppt(l.pickupAppt)):""}</div></div></div>
     <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="flex items-center justify-between"><span class="text-base font-semibold text-slate-900">${l.id}</span><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">${l.routing||""}</span></div><div class="mt-1 font-mono text-xs text-slate-500">${l.container||""} · ${l.customer||""}</div><div class="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><i data-lucide="info" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><span>${note}</span></div><div class="mt-4">${legsHtml}</div></div>
-    <div class="mt-3 grid grid-cols-2 gap-2"><button onclick="dvStatus('Arrived at terminal')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Arrived at terminal</button><button onclick="dvDeliver('${l.id}')" class="rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 active:bg-slate-50">Mark delivered</button></div>
+    <div class="mt-3 grid grid-cols-3 gap-2"><button onclick="dvArrive('${l.id}')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Arrived</button><button onclick="dvDepart('${l.id}')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Departed</button><button onclick="dvDeliver('${l.id}')" class="rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 active:bg-slate-50">Delivered</button></div>
     <button onclick="dvVoice()" class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-xs font-semibold active:bg-slate-50 ${dv.listening?'border-sky-400 bg-sky-50 text-sky-700':'border-slate-200 bg-white text-slate-700'}"><i data-lucide="mic" class="h-4 w-4"></i> ${dv.listening?'Listening…':'Hands-free status'}</button>
     <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-4"><div class="text-xs font-semibold text-slate-800">Paperwork</div><div class="mt-2 grid grid-cols-3 gap-2">${paper}</div></div></div>`;
 }
@@ -2206,7 +2232,8 @@ const SECTION_HUBS=[
   {section:"Operations",label:"Operations",icon:"truck",land:"dispatch"},
   {section:"Assets",label:"Assets & Equipment",icon:"warehouse",land:"chassis"},
   {section:"Drivers",label:"Drivers",icon:"users",land:"drivers"},
-  {section:"Customer",label:"Customer & Sales",icon:"building-2",land:"customers"},
+  {section:"Sales",label:"Sales",icon:"trending-up",land:"contractrates"},
+  {section:"CustomerService",label:"Customer Service",icon:"users",land:"custservice"},
   {section:"Integrations",label:"Integrations",icon:"plug",land:"integrations"},
   {section:"Tracking",label:"Tracking",icon:"map",land:"tracking"},
   {section:"Insights",label:"Reports",icon:"line-chart",land:"reports"},
@@ -2679,6 +2706,7 @@ function suggestAccessorials(id){
   var _m=l.meta||{},_d=_m.dates||{};var chS=_d.outgate||l.pickupAppt,chE=_d.ingate||_d.empty||l.deliveryAppt;if(chS){const days=Math.max(1,daysBetween(chS,chE));const rate=rateGet("chassis_day",cust);const amt=days*rate;sug.push({label:"Chassis",amount:amt,reason:who+": chassis out "+fmtAppt(chS)+(chE?(", terminated "+fmtAppt(chE)):"")+" ("+days+" day"+(days>1?"s":"")+") \u00b7 Penny: "+days+" \u00d7 "+money(rate)+" = "+money(amt)});}
   if(l.lfd){const free=rateGet("free_days",cust);const raw=daysBetween(l.lfd,l.deliveryAppt||l.pickupAppt);const days=raw-free;if(days>0){const rate=rateGet("perdiem_day",cust);const amt=days*rate;sug.push({label:"Per diem",amount:amt,reason:who+": LFD "+l.lfd+", "+raw+" day"+(raw>1?"s":"")+" past"+(free>0?(" minus "+free+" free"):"")+" \u00b7 Penny: "+days+" \u00d7 "+money(rate)+" = "+money(amt)});}}
   if(/prepull/i.test(l.routing||"")){const amt=rateGet("prepull",cust);if(amt>0)sug.push({label:"Prepull",amount:amt,reason:who+": routing is "+l.routing+" \u00b7 Penny: flat "+money(amt)});}
+  var _dd=(l.meta&&l.meta.dates)||{};if(_dd.arrived&&_dd.departed){var _hrs=0;try{_hrs=(new Date(String(_dd.departed).replace(" ","T"))-new Date(String(_dd.arrived).replace(" ","T")))/3600000;}catch(e){}var _free=rateGet("free_hours",cust)||2;if(_hrs>_free){var _det=rateGet("detention_hr",cust);if(_det>0)sug.push({label:"Detention",amount:_det,reason:who+": on-site "+_hrs.toFixed(1)+"h (free "+_free+"h) \u00b7 Penny: detention "+money(_det)});}}
   if(!sug.length){toast("No billable accessorials from this load\u2019s dates/routing");return;}
   state._sug={id:id,list:sug};
   wzModal(`<div class="border-b border-slate-100 px-5 py-4"><div class="text-base font-semibold text-slate-900">Suggested accessorials</div><div class="flex items-center gap-1.5 text-xs text-slate-500"><i data-lucide="sparkles" class="h-3.5 w-3.5 text-sky-500"></i> Ava reads the load, Penny does the math \u2014 uncheck any you don\u2019t want.</div></div>
@@ -2761,7 +2789,7 @@ function loadDetails(l){
   const dateInp=function(key,label){const v=key==="lfd"?(l.lfd||""):(dts[key]||"");return `<div><label class="mb-1 block text-[11px] text-slate-500">${label}</label><input id="md_${key}" type="date" value="${v}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div>`;};
   const txtInp=function(id,label,v){return `<div><label class="mb-1 block text-[11px] text-slate-500">${label}</label><input id="md_${id}" value="${String(v||"").replace(/"/g,'&quot;')}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div>`;};
   const flagBox=function(key,label){return `<label class="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" id="flag_${key}" ${f[key]?"checked":""}/> ${label}</label>`;};
-  return `<div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Dates</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${DATE_FIELDS.map(function(x){return dateInp(x[0],x[1]);}).join("")}</div></div>
+  return `<div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Dates</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${DATE_FIELDS.map(function(x){return dateInp(x[0],x[1]);}).join("")}</div><div class="mt-2 grid grid-cols-2 gap-2"><div><label class="mb-1 block text-[11px] text-slate-500">Arrived on-site</label><input id="md_arrived" type="datetime-local" value="${toLocalDT(dts.arrived)}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div><div><label class="mb-1 block text-[11px] text-slate-500">Departed on-site</label><input id="md_departed" type="datetime-local" value="${toLocalDT(dts.departed)}" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:border-sky-400"/></div></div></div>
   <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Equipment & references</h3><div class="grid grid-cols-2 gap-2 sm:grid-cols-4">${txtInp("size","Size",l.size)}${txtInp("type","Container type",m.containerType)}${txtInp("ssl","SSL",l.ssl)}${txtInp("chassis","Chassis #",m.chassis)}${txtInp("weight","Weight",m.weight)}${txtInp("commodity","Commodity",m.commodity)}${txtInp("mbl","MBL #",l.mbl)}${txtInp("houseBol","House BOL",m.houseBol)}${txtInp("ref","Reference #",m.ref)}</div>
   <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">${FLAG_OPTS.map(function(x){return flagBox(x[0],x[1]);}).join("")}</div>
   <button onclick="saveLoadMeta('${l.id}')" class="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">Save load details</button></div>`;
@@ -2770,6 +2798,7 @@ function saveLoadMeta(id){
   const l=LOADS.find(function(x){return x.id===id;});if(!l)return;
   l.meta=l.meta||{};l.meta.dates=l.meta.dates||{};l.meta.flags=l.meta.flags||{};
   DATE_FIELDS.forEach(function(d){const v=val("md_"+d[0]);if(d[0]==="lfd"){l.lfd=v;}else{l.meta.dates[d[0]]=v;}});
+  l.meta.dates.arrived=val("md_arrived");l.meta.dates.departed=val("md_departed");
   l.size=val("md_size");l.meta.containerType=val("md_type");l.ssl=val("md_ssl");l.mbl=val("md_mbl");l.meta.commodity=val("md_commodity");
   l.meta.chassis=val("md_chassis");l.meta.weight=val("md_weight");l.meta.houseBol=val("md_houseBol");l.meta.ref=val("md_ref");
   FLAG_OPTS.forEach(function(x){const el=document.getElementById("flag_"+x[0]);l.meta.flags[x[0]]=!!(el&&el.checked);});
@@ -2923,6 +2952,62 @@ function mPerDiemAudit(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="clock" class="h-4 w-4"></i> Containers past their per-diem free day \u2014 per-diem to recover or dispute.</div>${k}${panel("Per diem audit",tbl(["Load","Container","SSL","LFD","Days","Exposure"],rows))}</div>`;
 }
 
+/* ================= CUSTOMER SERVICE OVERVIEW ================= */
+function mCustomerHub(){
+  const inv=arReady();const custs={};
+  LOADS.forEach(function(l){if(l.customer){var c=custs[l.customer]=custs[l.customer]||{name:l.customer,loads:0,open:0,ar:0};c.loads++;if(l.status!=="delivered"&&l.status!=="completed")c.open++;}});
+  inv.forEach(function(i){if(i.customer_name){var c=custs[i.customer_name]=custs[i.customer_name]||{name:i.customer_name,loads:0,open:0,ar:0};if(i.status!=="paid"&&i.status!=="void")c.ar+=Number(i.total)||0;}});
+  const list=Object.keys(custs).map(function(k){return custs[k];});
+  const rows=list.length?list.map(function(c){return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">${c.name}</td><td class="px-4 py-3 tabular text-slate-600">${c.loads}</td><td class="px-4 py-3 tabular text-slate-600">${c.open}</td><td class="px-4 py-3 tabular ${c.ar>0?'text-amber-600':'text-slate-400'}">${c.ar>0?money(c.ar):'\u2014'}</td><td class="px-4 py-3">${c.ar>5000?'<span class="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">review credit</span>':'<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">good</span>'}</td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No customers yet.</td></tr>';
+  const k=kpis([["Customers",String(list.length)],["Open A/R",money(list.reduce(function(a,c){return a+c.ar;},0)),"text-amber-600"],["Active loads",String(list.reduce(function(a,c){return a+c.open;},0))]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="users" class="h-4 w-4"></i> Customer health \u2014 loads, receivables and credit at a glance.</div>${k}${panel("Customers",tbl(["Customer","Total loads","Open loads","Open A/R","Credit"],rows))}</div>`;
+}
+
+/* ================= AR AUDITS: chassis / waiting / disputes / credit memos ================= */
+function mChassisAudit(){
+  const items=LOADS.map(function(l){
+    var dts=(l.meta&&l.meta.dates)||{};var chS=dts.outgate||l.pickupAppt,chE=dts.ingate||dts.empty||l.deliveryAppt;var days=0;
+    try{if(chS){days=Math.max(1,Math.round((new Date(String(chE||chS).slice(0,10))-new Date(String(chS).slice(0,10)))/86400000));}}catch(e){}
+    var charged=((l.charges&&l.charges.items)||[]).filter(function(x){return /chassis/i.test(x.label||"");}).reduce(function(a,x){return a+(Number(x.amount)||0);},0);
+    var rate=(typeof rateGet==="function")?rateGet("chassis_day",l.customer):35;
+    return {l:l,days:days,charged:charged,expected:days*rate};
+  }).filter(function(x){return x.days>0||x.charged>0;});
+  const rows=items.length?items.map(function(p){var l=p.l;var flag=p.charged===0&&p.expected>0?"missed":(Math.abs(p.charged-p.expected)>1?"variance":"ok");var fc=flag==="missed"?'bg-red-50 text-red-700':flag==="variance"?'bg-amber-50 text-amber-700':'bg-emerald-50 text-emerald-700';return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${(l.meta&&l.meta.chassis)||"\u2014"}</td><td class="px-4 py-3 tabular text-slate-600">${p.days}d</td><td class="px-4 py-3 tabular text-slate-600">${money(p.expected)}</td><td class="px-4 py-3 tabular text-slate-800">${money(p.charged)}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${fc}">${flag}</span></td></tr>`;}).join(""):'<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No chassis activity to audit.</td></tr>';
+  const missed=items.filter(function(p){return p.charged===0&&p.expected>0;}).reduce(function(a,p){return a+p.expected;},0);
+  const k=kpis([["Loads audited",String(items.length)],["Unbilled chassis",money(missed),missed?"text-red-600":"text-emerald-600"],["Rate/day",money((typeof rateGet==="function")?rateGet("chassis_day"):35)]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="link" class="h-4 w-4"></i> Chassis days vs what was billed \u2014 catch unbilled chassis.</div>${k}${panel("Chassis audit",tbl(["Load","Chassis #","Days","Expected","Charged","Flag"],rows))}</div>`;
+}
+function mWaitingTimeAudit(){
+  const items=LOADS.filter(function(l){var d=(l.meta&&l.meta.dates)||{};return d.arrived&&d.departed;}).map(function(l){
+    var d=(l.meta&&l.meta.dates)||{};var hrs=0;try{hrs=(new Date(String(d.departed).replace(" ","T"))-new Date(String(d.arrived).replace(" ","T")))/3600000;}catch(e){}
+    var free=(typeof rateGet==="function")?(rateGet("free_hours",l.customer)||2):2;
+    var billed=((l.charges&&l.charges.items)||[]).some(function(x){return /detention/i.test(x.label||"");});
+    return {l:l,hrs:hrs,free:free,over:hrs>free,billed:billed};
+  });
+  const rows=items.length?items.map(function(p){var l=p.l;var flag=p.over&&!p.billed?"unbilled":(p.over?"billed":"within free");var fc=flag==="unbilled"?'bg-red-50 text-red-700':flag==="billed"?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500';return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 text-slate-700">${l.customer||""}</td><td class="px-4 py-3 tabular text-slate-600">${p.hrs.toFixed(1)}h</td><td class="px-4 py-3 tabular text-slate-500">${p.free}h</td><td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${fc}">${flag}</span></td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No on-site times logged yet.</td></tr>';
+  const unbilled=items.filter(function(p){return p.over&&!p.billed;}).length;
+  const k=kpis([["On-site logged",String(items.length)],["Detention unbilled",String(unbilled),unbilled?"text-red-600":"text-emerald-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="clock" class="h-4 w-4"></i> Waiting time vs free hours \u2014 catch unbilled detention.</div>${k}${panel("Waiting time audit",tbl(["Load","Customer","On-site","Free","Flag"],rows))}</div>`;
+}
+function dispToggle(id){var l=LOADS.find(function(x){return x.id===id;});if(!l)return;l.meta=l.meta||{};l.meta.disputed=!l.meta.disputed;if(WZ.sb)wzUpsertLoad(l);toast(l.meta.disputed?"Marked for dispute":"Dispute cleared");render();}
+window.dispToggle=dispToggle;
+function mDisputes(){
+  const cands=LOADS.filter(function(l){var d=(l.meta&&l.meta.dates)||{};var free=d.perdiemFree||l.lfd;var ret=d.ingate||d.empty||l.deliveryAppt;var pd=0;try{if(free&&ret)pd=Math.round((new Date(String(ret).slice(0,10))-new Date(String(free).slice(0,10)))/86400000);}catch(e){}return (l.meta&&l.meta.disputed)||pd>0||(l.holds||[]).length;});
+  const rows=cands.length?cands.map(function(l){var disp=l.meta&&l.meta.disputed;return `<tr class="hover:bg-slate-50"><td class="cursor-pointer px-4 py-3 font-medium text-sky-700" onclick="openLoad('${l.id}')">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 text-slate-600">${l.ssl||""}</td><td class="px-4 py-3"><div class="flex flex-wrap gap-1">${(l.holds||[]).length?'<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">holds</span>':''}<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">per-diem</span></div></td><td class="px-4 py-3 text-right"><button onclick="dispToggle('${l.id}')" class="rounded-md px-2.5 py-1.5 text-[11px] font-medium ${disp?'bg-red-500 text-white':'border border-slate-200 text-slate-600 hover:bg-slate-50'}">${disp?'Disputed':'Mark dispute'}</button></td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No dispute candidates.</td></tr>';
+  const open=cands.filter(function(l){return l.meta&&l.meta.disputed;}).length;
+  const k=kpis([["Candidates",String(cands.length)],["Open disputes",String(open),open?"text-red-600":"text-slate-900"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="scale" class="h-4 w-4"></i> Per-diem / hold dispute candidates \u2014 flag what you\u2019re contesting with the SSL.</div>${k}${panel("Disputes",tbl(["Load","Container","SSL","Reason",""],rows))}</div>`;
+}
+function cmAdd(){var c=val("cm_cust"),a=parseFloat(val("cm_amt"))||0,r=val("cm_reason");if(!c||!a){toast("Enter customer and amount");return;}state.creditMemos=state.creditMemos||[];state.creditMemos.push({cust:c,amt:a,reason:r,date:new Date().toISOString().slice(0,10)});toast("Credit memo issued");render();}
+window.cmAdd=cmAdd;
+function mCreditMemos(){
+  const cms=state.creditMemos||[];
+  const rows=cms.length?cms.map(function(m){return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-500">${m.date}</td><td class="px-4 py-3 text-slate-700">${m.cust}</td><td class="px-4 py-3 tabular text-red-600">-${money(m.amt)}</td><td class="px-4 py-3 text-slate-500">${m.reason||""}</td></tr>`;}).join(""):'<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No credit memos issued.</td></tr>';
+  const add=`<div class="wz-card"><div class="wz-card-head">Issue credit memo</div><div class="space-y-2 p-4"><input id="cm_cust" placeholder="Customer" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="cm_amt" type="number" placeholder="Amount" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="cm_reason" placeholder="Reason" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><button onclick="cmAdd()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Issue credit memo</button></div></div>`;
+  const k=kpis([["Credit memos",String(cms.length)],["Total credited",money(cms.reduce(function(a,m){return a+m.amt;},0)),"text-red-600"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="credit-card" class="h-4 w-4"></i> Credit memos issued to customers.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Credit memos",tbl(["Date","Customer","Amount","Reason"],rows))}</div>${add}</div></div>`;
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -2942,7 +3027,7 @@ function render(){
     scorecards:mScorecards,
     arap:mARAP,accessorials:mAccessorials,invoicing:mInvoicing,autoinvoice:mAutoInvoice,perdiem:mPerdiem,
     vendorbills:mVendorBills,ezpass:mEzpass,
-    customers:mCustomers,ratecards:mRateCards,
+    customers:mCustomers,ratecards:mRateCards,custservice:mCustomerHub,
     quotes:mQuotes,
     notifications:mNotifications,
     ocean:mOcean,holds:mHolds,
@@ -2967,7 +3052,7 @@ function render(){
     demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
-    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
+    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,chassisaudit:mChassisAudit,waitingaudit:mWaitingTimeAudit,disputes:mDisputes,creditmemos:mCreditMemos,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
     roles:mRoles,
     settings:mSettings,
   };
