@@ -350,6 +350,14 @@ const NAV = [
     {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
     {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
     {key:"approvals",label:"Ava Approvals",icon:"check-check"},
+    {key:"max",label:"Max — Ops",icon:"radar"},
+    {key:"maxmem",label:"Max’s Memory",icon:"sparkles"},
+    {key:"theo",label:"Theo — Track & Trace",icon:"megaphone"},
+    {key:"theomem",label:"Theo’s Memory",icon:"sparkles"},
+    {key:"quinn",label:"Quinn — Quoting",icon:"badge-dollar-sign"},
+    {key:"quinnmem",label:"Quinn’s Memory",icon:"sparkles"},
+    {key:"sam",label:"Sam — Compliance",icon:"shield-check"},
+    {key:"sammem",label:"Sam’s Memory",icon:"sparkles"},
   ]},
   {section:"AI",items:[
     {key:"ai",label:"AI Ops Assistant",icon:"sparkles"},
@@ -3015,17 +3023,69 @@ function mCreditMemos(){
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="credit-card" class="h-4 w-4"></i> Credit memos issued to customers.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Credit memos",tbl(["Date","Customer","Amount","Reason"],rows))}</div>${add}</div></div>`;
 }
 
-/* ================= WAYZ EMPLOYEES (Ava + Penny) ================= */
+/* ================= GENERIC AGENT MEMORY ================= */
+function memState(t){state.mem=state.mem||{};if(!state.mem[t])state.mem[t]={notes:null,loaded:false};return state.mem[t];}
+async function memLoad(t){var s=memState(t);if(!WZ.sb){s.notes=[];s.loaded=true;return;}try{var r=await WZ.sb.from(t).select("*").order("created_at",{ascending:true});if(!r.error)s.notes=r.data||[];}catch(e){s.notes=[];}s.loaded=true;render();}
+async function memAdd(t){var v=val("mem_"+t);if(!v){toast("Type a rule first");return;}var s=memState(t);s.notes=s.notes||[];if(WZ.sb){try{var r=await WZ.sb.from(t).insert({note:v}).select().single();if(r.error)throw r.error;s.notes.push(r.data||{note:v});}catch(e){toast("DB error: "+(e.message||e));return;}}else{s.notes.push({note:v});}toast("Learned it");render();}
+async function memDel(t,id){if(WZ.sb&&id){try{await WZ.sb.from(t).delete().eq("id",id);}catch(e){}}var s=memState(t);s.notes=(s.notes||[]).filter(function(n){return n.id!==id;});render();}
+window.memAdd=memAdd;window.memDel=memDel;
+function memPanel(agent,table){
+  var s=memState(table);if(WZ.sb&&!s.loaded)memLoad(table);var notes=s.notes||[];
+  var list=!WZ.sb?'<div class="p-6 text-center text-sm text-slate-400">Connect the database to manage '+agent+'\u2019s memory.</div>':(!s.loaded?'<div class="p-6 text-center text-sm text-slate-400">Loading\u2026</div>':(!notes.length?'<div class="p-6 text-center text-sm text-slate-400">No rules yet.</div>':'<div>'+notes.map(function(n){return '<div class="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-start gap-2 text-sm text-slate-700"><i data-lucide="sparkles" class="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-500"></i><span>'+String(n.note||"").replace(/</g,"&lt;")+'</span></div>'+(n.id?'<button onclick="memDel(\''+table+'\',\''+n.id+'\')" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="h-4 w-4"></i></button>':'')+'</div>';}).join("")+'</div>'));
+  var teach='<div class="wz-card"><div class="wz-card-head">Teach '+agent+'</div><div class="space-y-2 p-4"><textarea id="mem_'+table+'" rows="4" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400" placeholder="A plain-English rule for '+agent+'"></textarea><button onclick="memAdd(\''+table+'\')" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Teach '+agent+' this rule</button></div></div>';
+  return '<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">'+panel(agent+'\u2019s rulebook',list)+'</div>'+teach+'</div>';
+}
+function memScreen(agent,table){return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="sparkles" class="h-4 w-4"></i> Teach '+agent+' \u2014 rules '+agent+' applies to their work.</div>'+memPanel(agent,table)+'</div>';}
+function mMax(){
+  var atrisk=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";}).map(function(l){return {l:l,issues:(typeof loadIssues==="function")?loadIssues(l):[]};}).filter(function(x){return x.issues.length;});
+  var unassigned=LOADS.filter(function(l){return !l.driver&&l.status==="available";}).length;
+  var k=kpis([["At-risk loads",String(atrisk.length),atrisk.length?"text-amber-600":"text-emerald-600"],["Unassigned",String(unassigned)],["Agent","Max"]]);
+  var brief=atrisk.length?atrisk.slice(0,10).map(function(p){return '<div class="flex items-start gap-2 border-b border-slate-100 px-4 py-3 last:border-0"><i data-lucide="triangle-alert" class="mt-0.5 h-4 w-4 text-amber-500"></i><div class="flex-1"><button onclick="openLoad(\''+p.l.id+'\')" class="text-sm font-medium text-sky-700">'+p.l.id+'</button> <span class="text-xs text-slate-500">'+(p.l.container||"")+'</span><div class="text-xs text-slate-500">'+p.issues.join(" \u00b7 ")+'</div></div></div>';}).join(""):'<div class="p-6 text-center text-sm text-slate-400">Nothing at risk \u2014 smooth sailing.</div>';
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="radar" class="h-4 w-4"></i> Max \u2014 dispatch copilot. Watches LFD, demurrage, holds, HOS and unassigned loads.</div>'+k+panel("Today\u2019s dispatch brief",brief)+'</div>';
+}
+function theoUpdate(id){var l=LOADS.find(function(x){return x.id===id;});toast("Status update queued"+(l&&l.customer?(" for "+l.customer):""));}
+window.theoUpdate=theoUpdate;
+function mTheo(){
+  var active=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";});
+  var rows=active.length?active.map(function(l){var st=l.driver?"In transit":"Scheduled";return '<tr class="hover:bg-slate-50"><td class="cursor-pointer px-4 py-3 font-medium text-sky-700" onclick="openLoad(\''+l.id+'\')">'+l.id+'</td><td class="px-4 py-3 text-slate-700">'+(l.customer||"")+'</td><td class="px-4 py-3 font-mono text-xs text-slate-500">'+(l.container||"")+'</td><td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">'+st+'</span></td><td class="px-4 py-3 text-right"><button onclick="theoUpdate(\''+l.id+'\')" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Send update</button></td></tr>';}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No active shipments.</td></tr>';
+  var k=kpis([["Active shipments",String(active.length)],["In transit",String(active.filter(function(l){return l.driver;}).length)],["Agent","Theo"]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="megaphone" class="h-4 w-4"></i> Theo \u2014 track & trace. Proactive status updates and \u201cwhere\u2019s my container?\u201d replies.</div>'+k+panel("Shipments to update",tbl(["Load","Customer","Container","Status",""],rows))+'</div>';
+}
+function qAdd(){var c=val("q_cust"),lane=val("q_lane"),base=parseFloat(val("q_base"))||0;if(!c||!base){toast("Enter customer and rate");return;}state.quotes=state.quotes||[];state.quotes.unshift({cust:c,lane:lane,base:base,date:new Date().toISOString().slice(0,10),status:"sent"});toast("Quote sent to "+c);render();}
+window.qAdd=qAdd;
+function mQuinn(){
+  var qs=state.quotes||[];
+  var rows=qs.length?qs.map(function(q){return '<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-500">'+q.date+'</td><td class="px-4 py-3 text-slate-700">'+q.cust+'</td><td class="px-4 py-3 text-slate-600">'+(q.lane||"")+'</td><td class="px-4 py-3 tabular text-slate-800">'+money(q.base)+'</td><td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">'+q.status+'</span></td></tr>';}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No quotes yet.</td></tr>';
+  var add='<div class="wz-card"><div class="wz-card-head">New quote</div><div class="space-y-2 p-4"><input id="q_cust" placeholder="Customer" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="q_lane" placeholder="Lane (e.g. APM \u2192 Edison, NJ)" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="q_base" type="number" placeholder="All-in rate" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><button onclick="qAdd()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Send quote</button></div></div>';
+  var k=kpis([["Quotes",String(qs.length)],["Sent",String(qs.filter(function(q){return q.status==="sent";}).length)],["Agent","Quinn"]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Quinn \u2014 quoting. Builds quotes from your rate cards, sends and follows up.</div>'+k+'<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">'+panel("Quotes",tbl(["Date","Customer","Lane","Rate","Status"],rows))+'</div>'+add+'</div></div>';
+}
+function mSam(){
+  var lowHos=DRIVERS.filter(function(d){return (d.hos!=null&&d.hos<3);});
+  var rows=DRIVERS.length?DRIVERS.map(function(d){var flags=[];if(d.hos!=null&&d.hos<3)flags.push("Low HOS");return '<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">'+d.name+'</td><td class="px-4 py-3 text-slate-600">'+(d.truck||"")+'</td><td class="px-4 py-3 tabular text-slate-600">'+(d.hos==null?"\u2014":d.hos+"h")+'</td><td class="px-4 py-3">'+(flags.length?flags.map(function(f){return '<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">'+f+'</span>';}).join(" "):'<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">clear</span>')+'</td></tr>';}).join(""):'<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No drivers.</td></tr>';
+  var k=kpis([["Drivers monitored",String(DRIVERS.length)],["Alerts",String(lowHos.length),lowHos.length?"text-amber-600":"text-emerald-600"],["Agent","Sam"]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="shield-check" class="h-4 w-4"></i> Sam \u2014 safety & compliance. Monitors HOS, and (as you add them) license, medical, insurance, IFTA and drug-test dates.</div>'+k+panel("Driver compliance",tbl(["Driver","Truck","HOS","Status"],rows))+'</div>';
+}
+
+/* ================= WAYZ EMPLOYEES OVERVIEW ================= */
 function mEmployees(){
-  const inv=(typeof arReady==="function")?arReady():[];
-  const avaApprovals=LOADS.filter(function(l){return l.schedStatus==="needs_approval"||l.schedStatus==="reschedule_requested";}).length;
-  const pennyInvoices=inv.filter(function(i){return i.status==="draft";}).length;
-  const pennyReminders=inv.filter(function(i){return i.reminder_status==="draft";}).length;
-  function card(name,role,color,tasks,links){return `<div class="wz-card p-5"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-white" style="background:${color}">${name.charAt(0)}</div><div><div class="text-sm font-semibold text-slate-900">${name}</div><div class="text-xs text-slate-500">${role}</div></div></div><div class="mt-4 space-y-2">${tasks.map(function(t){return `<div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span class="text-slate-600">${t[0]}</span><span class="rounded-full px-2 py-0.5 text-xs font-medium ${t[1]>0?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'}">${t[1]}</span></div>`;}).join("")}</div><div class="mt-4 flex flex-wrap gap-2">${links.map(function(x){return `<button onclick="setActive('${x[1]}')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">${x[0]}</button>`;}).join("")}</div></div>`;}
-  return `<div class="p-6"><div class="mb-4 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="bot" class="h-4 w-4"></i> Your AI employees \u2014 what they\u2019re handling and what needs you.</div><div class="grid gap-4 md:grid-cols-2">
-    ${card("Ava","Front office \u00b7 orders & scheduling","#0ea5e9",[["Appointments needing approval",avaApprovals]],[["Ava Approvals","approvals"],["Ava\u2019s Memory","avamemory"]])}
-    ${card("Penny","Back office \u00b7 billing & AR","#10b981",[["Invoices to approve",pennyInvoices],["Reminders to approve",pennyReminders]],[["Penny\u2019s Desk","pennydesk"],["Penny\u2019s Memory","pennymemory"]])}
-  </div></div>`;
+  var inv=(typeof arReady==="function")?arReady():[];
+  var avaApprovals=LOADS.filter(function(l){return l.schedStatus==="needs_approval"||l.schedStatus==="reschedule_requested";}).length;
+  var pennyInv=inv.filter(function(i){return i.status==="draft";}).length;
+  var pennyRem=inv.filter(function(i){return i.reminder_status==="draft";}).length;
+  var atrisk=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed"&&((typeof loadIssues==="function")?loadIssues(l).length:0);}).length;
+  var active=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";}).length;
+  var quotes=(state.quotes||[]).length;
+  var alerts=DRIVERS.filter(function(d){return d.hos!=null&&d.hos<3;}).length;
+  function card(name,role,color,tasks,links){return '<div class="wz-card p-5"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-white" style="background:'+color+'">'+name.charAt(0)+'</div><div><div class="text-sm font-semibold text-slate-900">'+name+'</div><div class="text-xs text-slate-500">'+role+'</div></div></div><div class="mt-4 space-y-2">'+tasks.map(function(t){return '<div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span class="text-slate-600">'+t[0]+'</span><span class="rounded-full px-2 py-0.5 text-xs font-medium '+(t[1]>0?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700')+'">'+t[1]+'</span></div>';}).join("")+'</div><div class="mt-4 flex flex-wrap gap-2">'+links.map(function(x){return '<button onclick="setActive(\''+x[1]+'\')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">'+x[0]+'</button>';}).join("")+'</div></div>';}
+  return '<div class="p-6"><div class="mb-4 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="bot" class="h-4 w-4"></i> Your AI employees \u2014 what they\u2019re handling and what needs you.</div><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">'
+    +card("Ava","Front office \u00b7 orders & scheduling","#0ea5e9",[["Appointments needing approval",avaApprovals]],[["Ava Approvals","approvals"],["Memory","avamemory"]])
+    +card("Penny","Back office \u00b7 billing & AR","#10b981",[["Invoices to approve",pennyInv],["Reminders to approve",pennyRem]],[["Penny\u2019s Desk","pennydesk"],["Memory","pennymemory"]])
+    +card("Max","Dispatch copilot","#6366f1",[["At-risk loads",atrisk]],[["Open Max","max"],["Memory","maxmem"]])
+    +card("Theo","Track & trace","#f59e0b",[["Active shipments",active]],[["Open Theo","theo"],["Memory","theomem"]])
+    +card("Quinn","Quoting","#ec4899",[["Quotes sent",quotes]],[["Open Quinn","quinn"],["Memory","quinnmem"]])
+    +card("Sam","Safety & compliance","#0891b2",[["Compliance alerts",alerts]],[["Open Sam","sam"],["Memory","sammem"]])
+    +'</div></div>';
 }
 
 function render(){
@@ -3069,7 +3129,7 @@ function render(){
     /* v2 — Insights */
     tracking:mTracking,reports:mReports,execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
     /* v2 — AI */
-    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,employees:mEmployees,
+    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,employees:mEmployees,max:mMax,maxmem:function(){return memScreen("Max","max_memory");},theo:mTheo,theomem:function(){return memScreen("Theo","theo_memory");},quinn:mQuinn,quinnmem:function(){return memScreen("Quinn","quinn_memory");},sam:mSam,sammem:function(){return memScreen("Sam","sam_memory");},
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
     books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,chassisaudit:mChassisAudit,waitingaudit:mWaitingTimeAudit,disputes:mDisputes,creditmemos:mCreditMemos,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
