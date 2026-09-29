@@ -749,7 +749,7 @@ function openLoad(id){
         <div class="mt-1 text-[11px] text-slate-400">Full drayage accessorial lingo (chassis split, pre-pull, yard storage, DblMove, etc.) to be added.</div>
       </div>
 `:""}
-      ${LT==="docs"?`      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Documents</h3>
+      ${LT==="docs"?`      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Documents</h3><div class="mb-2 flex gap-2"><select id="dl_kind" class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs"><option>POD</option><option>TIR In</option><option>TIR Out</option><option>Delivery Order</option><option>BOL</option><option>Document</option></select><input id="dl_file" type="file" class="flex-1 text-xs"/><button onclick="docUpload(&#39;${l.id}&#39;)" class="wz-btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold">Upload</button></div>
         <div class="space-y-2">${l.docs.length===0?'<div class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">No documents attached yet.</div>':l.docs.map(d=>`<a href="${d.url||'#'}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 hover:border-sky-300 hover:bg-sky-50/40"><div class="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-slate-500"><i data-lucide="file-text" class="h-4 w-4"></i></div><div class="flex-1"><div class="text-sm font-medium text-slate-800">${d.type}</div><div class="truncate text-xs text-slate-400">${d.name}</div></div><i data-lucide="download" class="h-4 w-4 text-slate-400"></i></a>`).join("")}</div>
         <div class="mt-3 flex flex-wrap gap-2">${DOC_TYPES.map(t=>`<button onclick="toast(&#39;${t} attach requested&#39;)" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-600"><i data-lucide="paperclip" class="h-3.5 w-3.5"></i> ${t}</button>`).join("")}</div>
       </div>
@@ -2147,7 +2147,7 @@ function dvKey(d){if(dv.pin.length<4)dv.pin+=d;if(dv.pin.length>=4){dvDoLogin();
 function dvBack(){dv.pin=dv.pin.slice(0,-1);renderDriverView();}
 function dvDoLogin(){dv.driverName=val("dv_driver")||(DRIVERS[0]&&DRIVERS[0].name)||null;dv.screen="app";dv.pin="";renderDriverView();}
 function dvSignIn(){dvDoLogin();}
-function dvDriverLoads(){if(!dv.driverName)return [];return LOADS.filter(function(l){return l.driver===dv.driverName&&l.status!=="delivered"&&l.status!=="completed";});}
+function dvDriverLoads(){if(!dv.driverName)return [];return LOADS.filter(function(l){return l.driver===dv.driverName&&((l.status!=="delivered"&&l.status!=="completed")||l.podStatus==="pending"||l.podStatus==="requested");});}
 function dvGroupByDate(loads){var g={};loads.forEach(function(l){var d=(l.meta&&l.meta.dispatchDate)||"unscheduled";(g[d]=g[d]||[]).push(l);});return g;}
 function dvDeliver(id){var l=LOADS.find(function(x){return x.id===id;});if(l){l.status="delivered";if(WZ.sb)wzUpsertLoad(l);}toast("Marked delivered — Penny will draft the invoice");dv.load=null;renderDriverView();if(typeof render==="function")render();}
 window.dvDeliver=dvDeliver;
@@ -2183,7 +2183,7 @@ function dvLoadDetail(l){
   var legsHtml=legs.map(function(leg,i){return `<div class="flex gap-3"><div class="flex flex-col items-center"><div class="h-5 w-5 rounded-full border-2 border-slate-300 bg-white"></div>${i<legs.length-1?'<div class="h-6 w-0.5 bg-slate-200"></div>':''}</div><div class="pb-4 text-sm text-slate-700">${leg.n}</div></div>`;}).join("");
   var paper=["TIR In","POD","TIR Out"].map(function(x){return `<button onclick="dvScanType('${x}');dvTab('scan')" class="flex flex-col items-center gap-1 rounded-xl border border-dashed border-slate-300 py-3 text-[11px] text-slate-500 active:bg-slate-50"><i data-lucide="camera" class="h-4 w-4"></i> ${x}</button>`;}).join("");
   var note=(l.holds&&l.holds.length)?("Holds to clear: "+l.holds.join(", ")):"Have booking # and TWIC ready at the terminal.";
-  return `<div class="px-4 pt-3"><button onclick="dvTab('loads')" class="mb-2 flex items-center gap-1 text-xs text-slate-500"><i data-lucide="chevron-left" class="h-4 w-4"></i> My moves</button>
+  return `<div class="px-4 pt-3"><button onclick="dvTab('loads')" class="mb-2 flex items-center gap-1 text-xs text-slate-500"><i data-lucide="chevron-left" class="h-4 w-4"></i> My moves</button>${(l.podStatus==="pending"||l.podStatus==="requested")?'<div class="mb-3 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700"><i data-lucide="triangle-alert" class="h-4 w-4"></i> Ava needs the POD for this load \u2014 scan it below.</div>':''}
     <div class="mb-3 rounded-2xl p-4 text-white" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)"><div class="flex items-center justify-between"><div><div class="text-xs opacity-80">This move pays</div><div class="text-3xl font-semibold" style="font-family:var(--font-display)">$${pay}</div></div><div class="text-right text-[11px] opacity-90">${(l.meta&&l.meta.dispatchDate)?fmtDay(l.meta.dispatchDate):"Not scheduled"}<br>${l.pickupAppt?("Pickup "+fmtAppt(l.pickupAppt)):""}</div></div></div>
     <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="flex items-center justify-between"><span class="text-base font-semibold text-slate-900">${l.id}</span><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">${l.routing||""}</span></div><div class="mt-1 font-mono text-xs text-slate-500">${l.container||""} · ${l.customer||""}</div><div class="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><i data-lucide="info" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><span>${note}</span></div><div class="mt-4">${legsHtml}</div></div>
     <div class="mt-3 grid grid-cols-3 gap-2"><button onclick="dvArrive('${l.id}')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Arrived</button><button onclick="dvDepart('${l.id}')" class="rounded-xl bg-slate-900 py-3 text-xs font-semibold text-white active:bg-slate-800">Departed</button><button onclick="dvDeliver('${l.id}')" class="rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 active:bg-slate-50">Delivered</button></div>
@@ -3088,6 +3088,20 @@ function mEmployees(){
     +'</div></div>';
 }
 
+async function docUpload(id){
+  var kind=val("dl_kind")||"Document";var fileEl=document.getElementById("dl_file");var file=fileEl&&fileEl.files&&fileEl.files[0];
+  if(!file){toast("Choose a file first");return;}if(!WZ.sb){toast("Connect the database first");return;}
+  var path=id+"/"+Date.now()+"_"+file.name.replace(/[^A-Za-z0-9._-]/g,"_");toast("Uploading\u2026");
+  try{
+    var up=await WZ.sb.storage.from("load-docs").upload(path,file,{contentType:file.type||"application/pdf",upsert:true});if(up.error)throw up.error;
+    var pub=WZ.sb.storage.from("load-docs").getPublicUrl(path);var url=pub&&pub.data?pub.data.publicUrl:"";
+    var ins=await WZ.sb.from("load_docs").insert({load_id:id,kind:kind,storage_path:path,url:url});if(ins.error)throw ins.error;
+    var l=LOADS.find(function(x){return x.id===id;});if(l){l.docs=l.docs||[];l.docs.push({type:kind,name:file.name,url:url});}
+    toast(kind+" uploaded"+(kind==="POD"?" \u2014 Theo will send it to the customer":""));openLoad(id);render();
+  }catch(e){toast("Upload failed: "+(e.message||e));}
+}
+window.docUpload=docUpload;
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
@@ -3169,7 +3183,7 @@ function openInviteUser(){wzModal(`<div class="border-b border-slate-100 px-5 py
 function submitInvite(){const email=val("wzu_email");if(!email){toast("Email is required");return;}const rm={"Owner / Admin":"owner","Dispatcher":"dispatch","Billing / AR":"billing","Safety & Compliance":"safety","Read-only":"readonly"};USERS.push({name:val("wzu_name")||email,email:email,role:rm[val("wzu_role")]||"readonly",status:"Invited",last:"pending"});wzClose();toast("Invite sent to "+email);setActive("roles");}
 window.openInviteUser=openInviteUser;window.submitInvite=submitInvite;
 
-function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",schedStatus:r.sched_status||"",offeredSlots:r.offered_slots||[],proposedSlot:r.proposed_slot||null,meta:r.meta||{},consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
+function wzMapLoad(r){return {id:r.id,container:r.container||"",mbl:r.mbl||"",ssl:r.ssl||"",size:r.size||"",routing:r.routing||"Live",type:r.type||"IMP",status:r.status||"available",terminal:r.terminal||"",lfd:r.lfd||"",appt:r.appt||r.pickup_appt||null,pickupAppt:r.pickup_appt||"",deliveryAppt:r.delivery_appt||"",schedStatus:r.sched_status||"",offeredSlots:r.offered_slots||[],proposedSlot:r.proposed_slot||null,meta:r.meta||{},podStatus:r.pod_status||"",consignee:r.consignee||"",customer:r.customer_name||r.customer||"",driver:r.driver_name||null,holds:r.holds||[],flags:r.flags||[],charges:r.charges||{},ref:r.ref||""};}
 async function wzLoad(){
   if(!WZ.sb)return;
   try{const d=await WZ.sb.from("drivers").select("*");if(!d.error){DRIVERS.length=0;(d.data||[]).forEach(r=>DRIVERS.push({name:r.name,truck:r.truck||"—",status:r.status||"Available",loads:0,phone:r.phone||"—",hos:(r.hos==null?11:r.hos),chassis:r.chassis||"",kind:r.kind||"company",_id:r.id}));}}catch(e){}
