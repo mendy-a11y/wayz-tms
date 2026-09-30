@@ -1394,21 +1394,17 @@ function mLeakage(){
     </thead><tbody class="divide-y divide-slate-100">${rows.map(r=>{const a=r.incurred-r.billed;return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-mono text-xs text-slate-700">${r.c}</td><td class="px-4 py-3 tabular text-slate-700">$${r.incurred.toLocaleString()}</td><td class="px-4 py-3 tabular text-emerald-600">$${r.billed.toLocaleString()}</td><td class="px-4 py-3 tabular ${a>0?'font-semibold text-red-600':'text-slate-400'}">$${a.toLocaleString()}</td></tr>`;}).join("")}</tbody></table></div></div>`;
 }
 
+const SETTLE=[];
 function mProfitability(){
-  const cust=[{c:"Atlantic Wholesale",rev:18400,cost:12100},{c:"Meridian Foods",rev:14200,cost:9050},{c:"Northeast Retail",rev:9800,cost:7600},{c:"Global Export Co",rev:7200,cost:4400}];
-  cust.forEach(x=>x.margin=Math.round((x.rev-x.cost)/x.rev*100));
-  cust.sort((a,b)=>b.margin-a.margin);
-  const heat=[["APM→Edison",34],["PNCT→Newark",28],["Maher→Carteret",41],["GCT NY→Newark",19],["GCT Bay→Elizabeth",37]];
-  const hc=m=>m>=35?"bg-emerald-500":m>=25?"bg-emerald-300":m>=15?"bg-amber-300":"bg-red-300";
-  return `<div class="p-6"><div class="grid gap-4 lg:grid-cols-2">
-    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white"><div class="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-800">Customer profitability</div>
-      <table class="w-full text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Revenue</th><th class="px-4 py-3">Cost</th><th class="px-4 py-3">Margin</th></tr></thead>
-      <tbody class="divide-y divide-slate-100">${cust.map(x=>`<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-700">${x.c}</td><td class="px-4 py-3 tabular text-slate-700">$${x.rev.toLocaleString()}</td><td class="px-4 py-3 tabular text-slate-500">$${x.cost.toLocaleString()}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-semibold ${x.margin>=30?'bg-emerald-50 text-emerald-700':x.margin>=20?'bg-amber-50 text-amber-700':'bg-red-50 text-red-700'}">${x.margin}%</span></td></tr>`).join("")}</tbody></table>
-    </div>
-    <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="mb-3 text-sm font-semibold text-slate-800">Lane margin heatmap</div>
-      <div class="space-y-2">${heat.map(h=>`<div class="flex items-center gap-3"><div class="w-40 text-xs text-slate-600">${h[0]}</div><div class="flex h-6 flex-1 items-center justify-end rounded pr-2 text-[11px] font-medium text-white ${hc(h[1])}">${h[1]}%</div></div>`).join("")}</div>
-    </div>
-  </div></div>`;
+  var rows=LOADS.filter(function(l){return ((l.charges&&l.charges.base)||0)||l.driver;}).map(function(l){var rev=accTotal(l);var pay=(typeof loadDriverPay==="function"?(loadDriverPay(l)||0):0);return {l:l,rev:rev,pay:pay,m:rev-pay};});
+  var byCust={};rows.forEach(function(r){var c=r.l.customer||"(none)";byCust[c]=byCust[c]||{rev:0,pay:0,n:0};byCust[c].rev+=r.rev;byCust[c].pay+=r.pay;byCust[c].n++;});
+  var custs=Object.keys(byCust).map(function(c){var x=byCust[c];return {c:c,rev:x.rev,pay:x.pay,m:x.rev-x.pay,n:x.n,pct:x.rev?Math.round((x.rev-x.pay)/x.rev*100):0};}).sort(function(a,b){return b.m-a.m;});
+  var totRev=rows.reduce(function(a,r){return a+r.rev;},0),totPay=rows.reduce(function(a,r){return a+r.pay;},0),totM=totRev-totPay;
+  var k=kpis([["Revenue",money(totRev)],["Driver pay",money(totPay)],["Margin",money(totM),totM>=0?"text-emerald-600":"text-red-600"],["Margin %",(totRev?Math.round(totM/totRev*100):0)+"%"]]);
+  var crows=custs.length?custs.map(function(x){return '<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-700">'+x.c+'</td><td class="px-4 py-3 tabular text-slate-500">'+x.n+'</td><td class="px-4 py-3 tabular text-slate-700">'+money(x.rev)+'</td><td class="px-4 py-3 tabular text-slate-500">'+money(x.pay)+'</td><td class="px-4 py-3 tabular font-semibold '+(x.m>=0?"text-slate-900":"text-red-600")+'">'+money(x.m)+'</td><td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-semibold '+(x.pct>=30?"bg-emerald-50 text-emerald-700":x.pct>=15?"bg-amber-50 text-amber-700":"bg-red-50 text-red-700")+'">'+x.pct+'%</span></td></tr>';}).join(""):'<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No billable loads yet.</td></tr>';
+  var sorted=rows.slice().sort(function(a,b){return b.m-a.m;});
+  var lrows=sorted.length?sorted.slice(0,10).map(function(r){return '<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad(\''+r.l.id+'\')"><td class="px-4 py-3 font-medium text-sky-700">'+r.l.id+'</td><td class="px-4 py-3 text-slate-600">'+(r.l.customer||"")+'</td><td class="px-4 py-3 tabular text-slate-700">'+money(r.rev)+'</td><td class="px-4 py-3 tabular text-slate-500">'+money(r.pay)+'</td><td class="px-4 py-3 tabular font-semibold '+(r.m>=0?"text-emerald-600":"text-red-600")+'">'+money(r.m)+'</td></tr>';}).join(""):'<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-400">No loads.</td></tr>';
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="trending-up" class="h-4 w-4"></i> True margin \u2014 revenue minus driver pay, per customer and per load.</div>'+k+'<div class="grid gap-4 lg:grid-cols-2"><div>'+panel("By customer",'<table class="w-full text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Loads</th><th class="px-4 py-3">Revenue</th><th class="px-4 py-3">Driver pay</th><th class="px-4 py-3">Margin</th><th class="px-4 py-3">%</th></tr></thead><tbody class="divide-y divide-slate-100">'+crows+'</tbody></table>')+'</div><div>'+panel("Top loads by margin",'<table class="w-full text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-4 py-3">Load</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Rev</th><th class="px-4 py-3">Pay</th><th class="px-4 py-3">Margin</th></tr></thead><tbody class="divide-y divide-slate-100">'+lrows+'</tbody></table>')+'</div></div></div>';
 }
 
 function mAI(){
@@ -1570,30 +1566,16 @@ const MATCHES=[
 function approveTurn(id){const m=MATCHES.find(x=>x.id===id);if(m)m.done=true;render();}
 window.approveTurn=approveTurn;
 function mStreetTurns(){
-  const open=MATCHES.filter(m=>!m.done);
-  const saved=MATCHES.filter(m=>m.done).reduce((a,m)=>a+m.save,0);
-  const potential=open.reduce((a,m)=>a+m.save,0);
-  const qtone={High:"bg-emerald-50 text-emerald-700 ring-emerald-200",Triangulation:"bg-amber-50 text-amber-700 ring-amber-200"};
-  return `<div class="p-6">
-    <div class="mb-5 grid grid-cols-3 gap-3">
-      <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-xs text-slate-500">Open matches</div><div class="mt-1 text-2xl font-semibold text-slate-900">${open.length}</div></div>
-      <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-xs text-slate-500">Potential savings</div><div class="mt-1 text-2xl font-semibold text-sky-600">$${potential.toLocaleString()}</div></div>
-      <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-xs text-slate-500">Captured today</div><div class="mt-1 text-2xl font-semibold text-emerald-600">$${saved.toLocaleString()}</div></div>
-    </div>
-    <div class="space-y-3">${MATCHES.map(m=>`<div class="rounded-xl border ${m.done?'border-emerald-200 bg-emerald-50/40':'border-slate-200 bg-white'} p-4">
-      <div class="mb-3 flex items-center justify-between"><span class="rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${qtone[m.quality]||'bg-slate-50 text-slate-600 ring-slate-200'}">${m.quality} match</span><div class="text-right text-xs text-slate-500">saves <span class="font-semibold text-sky-600">$${m.save}</span> · ${m.miles} mi avoided</div></div>
-      <div class="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-        <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Import empty</div><div class="flex items-center gap-1.5"><span class="font-mono text-xs text-slate-700">${m.imp.container}</span><span class="rounded bg-slate-100 px-1 py-0.5 text-[9px] text-slate-500">${m.imp.ssl} ${m.imp.size}</span></div><div class="mt-1 text-xs text-slate-500">${m.imp.city} · ready ${m.imp.ready}</div><div class="text-[11px] text-slate-400">${m.imp.customer}</div></div>
-        <div class="flex items-center justify-center"><i data-lucide="repeat" class="h-5 w-5 text-sky-500"></i></div>
-        <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Export booking</div><div class="flex items-center gap-1.5"><span class="font-mono text-xs text-slate-700">${m.exp.booking}</span><span class="rounded bg-slate-100 px-1 py-0.5 text-[9px] text-slate-500">${m.exp.ssl} ${m.exp.size}</span></div><div class="mt-1 text-xs text-slate-500">${m.exp.city} · cutoff ${m.exp.cutoff}</div><div class="text-[11px] text-slate-400">${m.exp.customer}</div></div>
-      </div>
-      <div class="mt-3 flex justify-end">${m.done?'<span class="flex items-center gap-1 text-xs font-medium text-emerald-600"><i data-lucide="check-circle-2" class="h-4 w-4"></i> Street turn approved</span>':`<button onclick="approveTurn('${m.id}')" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800">Approve street turn</button>`}</div>
-    </div>`).join("")}</div></div>`;
+  var imports=LOADS.filter(function(l){return l.type!=="EXP"&&l.ssl&&l.status!=="completed";});
+  var exports=LOADS.filter(function(l){return l.type==="EXP"&&l.ssl;});
+  var matches=[];
+  exports.forEach(function(ex){imports.forEach(function(im){if(im.id!==ex.id&&String(im.ssl).toUpperCase()===String(ex.ssl).toUpperCase()&&(!im.size||!ex.size||im.size===ex.size)){matches.push({im:im,ex:ex});}});});
+  var save=function(cust){return rateGet("prepull",cust)+rateGet("drop_fee",cust);};
+  var rows=matches.length?matches.map(function(m){return '<tr class="hover:bg-slate-50"><td class="px-4 py-3"><button onclick="openLoad(\''+m.im.id+'\')" class="font-medium text-sky-700">'+m.im.id+'</button> <span class="text-[11px] text-slate-400">import empty</span></td><td class="px-4 py-3 text-slate-600">'+(m.im.ssl||"")+' \u00b7 '+(m.im.size||"")+'</td><td class="px-4 py-3"><button onclick="openLoad(\''+m.ex.id+'\')" class="font-medium text-sky-700">'+m.ex.id+'</button> <span class="text-[11px] text-slate-400">export needs box</span></td><td class="px-4 py-3 tabular font-semibold text-emerald-600">~'+money(save(m.ex.customer))+' saved</td></tr>';}).join(""):'<tr><td colspan="4" class="px-4 py-10 text-center text-sm text-slate-400">No street-turn matches right now \u2014 need an import empty and an export of the same steamship line.</td></tr>';
+  var k=kpis([["Street-turn matches",String(matches.length),matches.length?"text-emerald-600":"text-slate-900"],["Est. savings",money(matches.reduce(function(a,m){return a+save(m.ex.customer);},0)),"text-emerald-600"],["How","reuse the box"]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="repeat" class="h-4 w-4"></i> Reuse an import\u2019s empty for an export of the same line \u2014 turn two moves into one.</div>'+k+panel("Street-turn matches",'<table class="w-full text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-4 py-3">Import (empty)</th><th class="px-4 py-3">SSL / Size</th><th class="px-4 py-3">Export (needs box)</th><th class="px-4 py-3">Savings</th></tr></thead><tbody class="divide-y divide-slate-100">'+rows+'</tbody></table>')+'</div>';
 }
 
-/* ---- Settlements ---- */
-const SETTLE=[];
-const dedSum=s=>Object.values(s.ded).reduce((a,b)=>a+b,0);
 function approveSettle(name){const s=SETTLE.find(x=>x.name===name);if(s)s.status="Approved";render();}
 function selSettle(name){state.settleSel=name;render();}
 window.approveSettle=approveSettle;window.selSettle=selSettle;
