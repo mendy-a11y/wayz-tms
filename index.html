@@ -269,6 +269,8 @@ const NAV = [
     {key:"emailintake",label:"Email Intake",icon:"mail-open",tag:1},
     {key:"watchlist",label:"Watchlist",icon:"bell-ring"},
     {key:"problems",label:"Problem Containers",icon:"triangle-alert"},
+    {key:"demurragewatch",label:"Demurrage Watch",icon:"alarm-clock"},
+    {key:"outlook",label:"Dispatch Outlook",icon:"calendar-days"},
     {key:"streetturns",label:"Street Turns",icon:"repeat"},
     {key:"whatif",label:"What-If Simulator",icon:"shuffle"},
     {key:"yard",label:"Yard",icon:"warehouse"},
@@ -306,6 +308,7 @@ const NAV = [
   ]},
   {section:"CustomerService",items:[
     {key:"custservice",label:"Overview",icon:"users"},
+    {key:"onboarding",label:"Onboard Customer",icon:"user-plus"},
     {key:"customers",label:"Customer Portal",icon:"building-2"},
     {key:"credithold",label:"Credit Holds",icon:"lock"},
     {key:"custapp",label:"Customer App",icon:"smartphone"},
@@ -346,6 +349,7 @@ const NAV = [
   ]},
   {section:"Employees",items:[
     {key:"employees",label:"Overview",icon:"users"},
+    {key:"activity",label:"Activity Feed",icon:"activity"},
     {key:"pennydesk",label:"Penny’s Desk",icon:"receipt"},
     {key:"pennymemory",label:"Penny’s Memory",icon:"sparkles"},
     {key:"avamemory",label:"Ava’s Memory",icon:"sparkles"},
@@ -377,6 +381,7 @@ const NAV = [
     {key:"disputes",label:"Disputes",icon:"scale"},
     {key:"creditmemos",label:"Credit Memos",icon:"credit-card"},
     {key:"arapply",label:"Apply Payments",icon:"banknote"},
+    {key:"recovery",label:"Recovery Center",icon:"search-check"},
   ]},
   {section:"AP",items:[
     {key:"apdriverpay",label:"Driver Pay",icon:"banknote"},
@@ -2681,7 +2686,7 @@ function mPennyDesk(){
   const remRows=rems.length?rems.map(function(i){return `<div class="border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex items-center justify-between"><div><div class="text-sm font-medium text-slate-800">${i.number||i.id} \u00b7 ${fmtMoney(i.total)}</div><div class="text-[11px] text-amber-600">Past due \u2014 reminder drafted</div></div><div class="flex gap-2"><button onclick="remApprove('${i.id}')" class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Approve & send</button><button onclick="remSkip('${i.id}')" class="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Skip</button></div></div></div>`;}).join(""):'<div class="p-6 text-center text-xs text-slate-400">No reminders drafted.</div>';
   const openAr=inv.filter(function(i){return i.status==="sent";}).reduce(function(a,i){return a+(Number(i.total)||0);},0);
   const k=kpis([["Invoices to approve",String(drafts.length),drafts.length?"text-amber-600":"text-emerald-600"],["Reminders to approve",String(rems.length),rems.length?"text-amber-600":"text-emerald-600"],["Open A/R (sent)",fmtMoney(openAr)]]);
-  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="receipt" class="h-4 w-4"></i> Penny drafts invoices on delivery and payment reminders when overdue \u2014 you approve, she sends.</div>${k}<div class="grid gap-4 xl:grid-cols-2"><div class="wz-card"><div class="wz-card-head">Invoices awaiting approval</div>${draftRows}</div><div class="wz-card"><div class="wz-card-head">Payment reminders awaiting approval</div>${remRows}</div></div><div class="wz-card mt-4"><div class="wz-card-head">Billing rates — Penny uses these to calculate accessorials</div><div class="grid gap-3 p-4 sm:grid-cols-3">${[["chassis_day","Chassis / day"],["perdiem_day","Per diem / day"],["prepull","Prepull (flat)"],["free_days","Per-diem free days"],["detention_hr","Detention / hr"],["drop_fee","Drop fee"]].map(function(r){return `<div><label class=\"mb-1 block text-xs text-slate-500\">${r[1]}</label><input id=\"rate_${r[0]}\" type=\"number\" value=\"${rateGet(r[0])}\" class=\"w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400\"/></div>`;}).join("")}</div><div class="px-4 pb-4"><button onclick="saveRates()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Save rates</button></div></div><div class="wz-card mt-4"><div class="wz-card-head">Customer billing rules \u2014 overrides for a specific customer</div><div class="grid gap-3 p-4 sm:grid-cols-3"><div class="sm:col-span-3"><label class="mb-1 block text-xs text-slate-500">Customer</label><input id="cr_customer" placeholder="e.g. BRS Global Logistics" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400"/></div>${[["chassis_day","Chassis / day"],["perdiem_day","Per diem / day"],["prepull","Prepull (0 = not billed)"],["free_days","Per-diem free days"],["detention_hr","Detention / hr"]].map(function(r){return `<div><label class=\"mb-1 block text-xs text-slate-500\">${r[1]}</label><input id=\"cr_${r[0]}\" type=\"number\" placeholder=\"default\" class=\"w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400\"/></div>`;}).join("")}</div><div class="px-4 pb-4"><button onclick="saveCustRates()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Save for customer</button></div>${Object.keys(state.custRates||{}).length?('<div class="border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500">Custom rules set for: '+Object.keys(state.custRates).join(", ")+'</div>'):''}</div></div>`;
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="receipt" class="h-4 w-4"></i> Penny drafts invoices on delivery and payment reminders when overdue \u2014 you approve, she sends.</div>${k}<div class="grid gap-4 xl:grid-cols-2"><div class="wz-card"><div class="wz-card-head">Invoices awaiting approval</div>${draftRows}</div><div class="wz-card"><div class="wz-card-head">Payment reminders awaiting approval</div>${remRows}</div></div><div class="wz-card mt-4"><div class="wz-card-head">Billing rates — Penny uses these to calculate accessorials</div><div class="grid gap-3 p-4 sm:grid-cols-3">${[["chassis_day","Chassis / day"],["perdiem_day","Per diem / day"],["demurrage_day","Demurrage / day"],["prepull","Prepull (flat)"],["free_days","Per-diem free days"],["detention_hr","Detention / hr"],["drop_fee","Drop fee"]].map(function(r){return `<div><label class=\"mb-1 block text-xs text-slate-500\">${r[1]}</label><input id=\"rate_${r[0]}\" type=\"number\" value=\"${rateGet(r[0])}\" class=\"w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400\"/></div>`;}).join("")}</div><div class="px-4 pb-4"><button onclick="saveRates()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Save rates</button></div></div><div class="wz-card mt-4"><div class="wz-card-head">Customer billing rules \u2014 overrides for a specific customer</div><div class="grid gap-3 p-4 sm:grid-cols-3"><div class="sm:col-span-3"><label class="mb-1 block text-xs text-slate-500">Customer</label><input id="cr_customer" placeholder="e.g. BRS Global Logistics" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400"/></div>${[["chassis_day","Chassis / day"],["perdiem_day","Per diem / day"],["demurrage_day","Demurrage / day"],["prepull","Prepull (0 = not billed)"],["free_days","Per-diem free days"],["detention_hr","Detention / hr"]].map(function(r){return `<div><label class=\"mb-1 block text-xs text-slate-500\">${r[1]}</label><input id=\"cr_${r[0]}\" type=\"number\" placeholder=\"default\" class=\"w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400\"/></div>`;}).join("")}</div><div class="px-4 pb-4"><button onclick="saveCustRates()" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Save for customer</button></div>${Object.keys(state.custRates||{}).length?('<div class="border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500">Custom rules set for: '+Object.keys(state.custRates).join(", ")+'</div>'):''}</div></div>`;
 }
 
 /* ================= ACCESSORIALS EDITOR ================= */
@@ -2704,7 +2709,7 @@ function delAccessorial(id,idx){const l=LOADS.find(function(x){return x.id===id;
 window.addAccessorial=addAccessorial;window.delAccessorial=delAccessorial;
 
 /* ================= RATES + AVA<>PENNY ACCESSORIAL SUGGESTIONS ================= */
-const RATE_DEFAULTS={chassis_day:35,perdiem_day:150,prepull:100,detention_hr:75,free_hours:2,free_days:0,drop_fee:50};
+const RATE_DEFAULTS={chassis_day:35,perdiem_day:150,demurrage_day:175,prepull:100,detention_hr:75,free_hours:2,free_days:0,drop_fee:50};
 function rateGet(k,cust){if(cust&&state.custRates&&state.custRates[cust]&&state.custRates[cust][k]!=null)return Number(state.custRates[cust][k]);if(state.rates&&state.rates[k]!=null)return Number(state.rates[k]);return RATE_DEFAULTS[k];}
 async function loadRates(){if(!WZ.sb)return;try{const r=await WZ.sb.from("rates").select("*");if(!r.error){state.rates=state.rates||{};(r.data||[]).forEach(function(row){state.rates[row.key]=Number(row.amount);});}}catch(e){}}
 async function saveRates(){state.rates=state.rates||{};Object.keys(RATE_DEFAULTS).forEach(function(k){const v=val("rate_"+k);if(v!=="")state.rates[k]=Number(v);});if(WZ.sb){try{const rows=Object.keys(state.rates).map(function(k){return {key:k,amount:state.rates[k]};});await WZ.sb.from("rates").upsert(rows);}catch(e){}}toast("Billing rates saved");render();}
@@ -3129,13 +3134,87 @@ async function docUpload(id){
 }
 window.docUpload=docUpload;
 
+/* ================= DEMURRAGE WATCH ================= */
+function mDemurrageWatch(){
+  var today=new Date(wzToday()+"T00:00");
+  function dtl(lfd){try{return Math.round((new Date(lfd+"T00:00")-today)/86400000);}catch(e){return null;}}
+  var items=LOADS.filter(function(l){var d=(l.meta&&l.meta.dates)||{};return l.status!=="delivered"&&l.status!=="completed"&&l.lfd&&!d.outgate;}).map(function(l){
+    var days=dtl(l.lfd);var rate=rateGet("demurrage_day",l.customer);var over=(days!=null&&days<0)?-days:0;
+    return {l:l,days:days,over:over,rate:rate,accrued:over*rate};
+  });
+  items.sort(function(a,b){ if(a.accrued!==b.accrued) return b.accrued-a.accrued; return (a.days==null?999:a.days)-(b.days==null?999:b.days); });
+  var rows=items.length?items.map(function(p){var l=p.l;var badge=p.over?('<span class="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">'+p.over+'d overdue</span>'):(p.days!=null&&p.days<=2?('<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">'+p.days+'d left</span>'):('<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">'+(p.days==null?"\u2014":p.days+"d")+'</span>'));return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 text-slate-600">${l.terminal||""}</td><td class="px-4 py-3 text-slate-700">${l.customer||""}</td><td class="px-4 py-3 text-slate-500">${l.lfd}</td><td class="px-4 py-3">${badge}</td><td class="px-4 py-3 tabular ${p.accrued?'font-semibold text-red-600':'text-slate-400'}">${p.accrued?money(p.accrued):'\u2014'}</td></tr>`;}).join(""):'<tr><td colspan="7" class="px-4 py-10 text-center text-sm text-slate-400">No containers at demurrage risk \u2014 all clear.</td></tr>';
+  var totalAccrued=items.reduce(function(a,p){return a+p.accrued;},0);
+  var overdue=items.filter(function(p){return p.over>0;}).length;
+  var imminent=items.filter(function(p){return p.over===0&&p.days!=null&&p.days<=2;}).length;
+  var k=kpis([["Accruing now",money(totalAccrued),totalAccrued?"text-red-600":"text-emerald-600"],["Overdue containers",String(overdue),overdue?"text-red-600":"text-slate-900"],["LFD within 2 days",String(imminent),imminent?"text-amber-600":"text-slate-900"]]);
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="alarm-clock" class="h-4 w-4"></i> Containers still at the terminal, ranked by demurrage at risk \u2014 pull the top of this list first.</div>${k}${panel("Demurrage watch",tbl(["Load","Container","Terminal","Customer","LFD","Countdown","Accruing"],rows))}</div>`;
+}
+
+/* ================= RECOVERY CENTER (#2) ================= */
+function mRecoveryCenter(){
+  var inv=(typeof arReady==="function")?arReady():[];var byLoad={};inv.forEach(function(i){if(i.load_id)byLoad[i.load_id]=i;});
+  var chassis=0,chN=0;LOADS.forEach(function(l){var d=(l.meta&&l.meta.dates)||{};var chS=d.outgate||l.pickupAppt,chE=d.ingate||d.empty||l.deliveryAppt;if(!chS)return;var days=Math.max(1,daysBetween(chS,chE));var charged=((l.charges&&l.charges.items)||[]).filter(function(x){return /chassis/i.test(x.label||"");}).reduce(function(a,x){return a+(Number(x.amount)||0);},0);var exp=days*rateGet("chassis_day",l.customer);if(charged===0&&exp>0){chassis+=exp;chN++;}});
+  var det=0,detN=0;LOADS.forEach(function(l){var d=(l.meta&&l.meta.dates)||{};if(!d.arrived||!d.departed)return;var hrs=0;try{hrs=(new Date(String(d.departed).replace(" ","T"))-new Date(String(d.arrived).replace(" ","T")))/3600000;}catch(e){}var free=rateGet("free_hours",l.customer)||2;var billed=((l.charges&&l.charges.items)||[]).some(function(x){return /detention/i.test(x.label||"");});if(hrs>free&&!billed){det+=rateGet("detention_hr",l.customer);detN++;}});
+  var pd=0,pdN=0;LOADS.forEach(function(l){if(!l.lfd)return;var d=(l.meta&&l.meta.dates)||{};var free=d.perdiemFree||l.lfd;var ret=d.ingate||d.empty||l.deliveryAppt;var raw=0;try{if(free&&ret)raw=Math.round((new Date(String(ret).slice(0,10))-new Date(String(free).slice(0,10)))/86400000);}catch(e){}var days=raw-(rateGet("free_days",l.customer)||0);if(days>0){pd+=days*rateGet("perdiem_day",l.customer);pdN++;}});
+  var exc=LOADS.filter(function(l){return (l.status==="delivered"||l.status==="completed")&&(!l.customer||!((l.charges&&l.charges.base)||0)||!byLoad[l.id]);}).length;
+  var total=chassis+det+pd;
+  var card=function(label,amt,n,key,cls){return '<button onclick="setActive(\''+key+'\')" class="wz-card p-5 text-left transition hover:border-sky-300"><div class="text-xs text-slate-500">'+label+'</div><div class="mt-1 text-2xl font-semibold tabular '+(cls||"text-slate-900")+'">'+money(amt)+'</div><div class="mt-1 text-[11px] text-slate-400">'+n+' load'+(n!==1?"s":"")+' \u2014 review</div></button>';};
+  var k=kpis([["Recoverable now",money(total),total?"text-red-600":"text-emerald-600"],["Chassis",money(chassis)],["Detention",money(det)],["Per-diem",money(pd)]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="search-check" class="h-4 w-4"></i> Money you can still bill \u2014 work this weekly and recover it.</div>'+k+'<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">'+card("Unbilled chassis",chassis,chN,"chassisaudit","text-red-600")+card("Unbilled detention",det,detN,"waitingaudit","text-red-600")+card("Per-diem exposure",pd,pdN,"perdiemaudit","text-amber-600")+'<button onclick="setActive(\'billingexc\')" class="wz-card p-5 text-left transition hover:border-sky-300"><div class="text-xs text-slate-500">Billing exceptions</div><div class="mt-1 text-2xl font-semibold tabular text-amber-600">'+exc+'</div><div class="mt-1 text-[11px] text-slate-400">need fixing \u2014 review</div></button></div></div>';
+}
+/* ================= DISPATCH OUTLOOK (#3) ================= */
+function mDispatchOutlook(){
+  var today=new Date(wzToday()+"T00:00");var days=[];
+  for(var i=0;i<7;i++){var d=new Date(today);d.setDate(d.getDate()+i);var key=d.toISOString().slice(0,10);
+    var assigned=LOADS.filter(function(l){return l.driver&&l.status!=="delivered"&&l.status!=="completed"&&((l.meta&&l.meta.dispatchDate)===key);}).length;
+    days.push({key:key,assigned:assigned});
+  }
+  var unassigned=LOADS.filter(function(l){return !l.driver&&l.status==="available";}).length;
+  var rows=days.map(function(x){return '<button onclick="state.planDate=\''+x.key+'\';setActive(\'planner\')" class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left hover:border-sky-300"><div><div class="text-sm font-semibold text-slate-800">'+fmtDay(x.key)+'</div><div class="text-[11px] text-slate-400">'+x.assigned+' scheduled</div></div><i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i></button>';}).join("");
+  var k=kpis([["Unassigned",String(unassigned),unassigned?"text-amber-600":"text-emerald-600"],["Planning window","7 days"],["Copilot","Max"]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="calendar-days" class="h-4 w-4"></i> Plan the week \u2014 assign loads to days now so drivers open a full schedule. Tap a day to plan it.</div>'+k+'<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">'+rows+'</div></div>';
+}
+/* ================= CUSTOMER ONBOARDING (#1 + #4) ================= */
+async function onboardSave(){
+  var cust=val("ob_cust");if(!cust){toast("Enter a customer name");return;}
+  var domain=val("ob_domain"),terms=val("ob_terms"),cc=val("ob_cc");
+  var ava=[],penny=[];
+  if(domain)ava.push("Emails from "+domain+" are customer "+cust+".");
+  var pr=cust;if(terms)pr+=" is Net "+terms;if(cc)pr+="; CC "+cc+" on invoices";pr+=".";penny.push(pr);
+  if(WZ.sb){try{if(ava.length)await WZ.sb.from("ai_memory").insert(ava.map(function(n){return {note:n};}));await WZ.sb.from("penny_memory").insert(penny.map(function(n){return {note:n};}));}catch(e){toast("DB error: "+(e.message||e));return;}}
+  toast(cust+" onboarded \u2014 Ava & Penny taught");render();
+}
+window.onboardSave=onboardSave;
+function mOnboarding(){
+  var k=kpis([["Setup","3 steps"],["Feeds","Ava \u00b7 Penny \u00b7 Rates"]]);
+  var form='<div class="wz-card"><div class="wz-card-head">New customer setup</div><div class="space-y-2 p-4"><input id="ob_cust" placeholder="Customer name (e.g. BRS Global)" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="ob_domain" placeholder="Their email domain (e.g. @brsglobal.com)" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="ob_terms" type="number" placeholder="Payment terms (Net days, e.g. 30)" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="ob_cc" placeholder="AP / billing CC email" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><button onclick="onboardSave()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Onboard customer</button></div></div>';
+  var steps='<div class="wz-card"><div class="wz-card-head">Onboarding checklist</div><div class="space-y-3 p-4 text-sm text-slate-600"><div class="flex items-start gap-2"><span class="font-semibold text-sky-500">1.</span> Fill the form \u2014 Ava learns their email domain, Penny learns their terms &amp; CC.</div><div class="flex items-start gap-2"><span class="font-semibold text-sky-500">2.</span> Upload their rate card so Quinn quotes and Penny bills right. <button onclick="setActive(\'ratecards\')" class="font-medium text-sky-600 underline">Rate Cards</button></div><div class="flex items-start gap-2"><span class="font-semibold text-sky-500">3.</span> Set per-customer rate overrides on <button onclick="setActive(\'pennydesk\')" class="font-medium text-sky-600 underline">Penny\u2019s Desk</button>.</div></div></div>';
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="user-plus" class="h-4 w-4"></i> Onboard a customer once \u2014 the AI team is set up for them forever.</div>'+k+'<div class="grid gap-4 lg:grid-cols-2">'+form+steps+'</div></div>';
+}
+/* ================= AGENT ACTIVITY FEED (#6) ================= */
+function feedState(){if(!state.feed)state.feed={items:null,loaded:false};return state.feed;}
+async function feedLoad(){var s=feedState();if(!WZ.sb){s.items=[];s.loaded=true;return;}var items=[];
+  try{var l=await WZ.sb.from("loads").select("id,container,created_at").order("created_at",{ascending:false}).limit(15);(l.data||[]).forEach(function(r){items.push({agent:"Ava",color:"#0ea5e9",text:"created load "+r.id+" ("+(r.container||"")+")",t:r.created_at});});}catch(e){}
+  try{var iv=await WZ.sb.from("invoices").select("number,status,total,created_at,issued_at").order("created_at",{ascending:false}).limit(15);(iv.data||[]).forEach(function(r){items.push({agent:"Penny",color:"#10b981",text:(r.status==="sent"?"sent":"drafted")+" invoice "+(r.number||"")+" "+money(r.total),t:r.issued_at||r.created_at});});}catch(e){}
+  try{var q=await WZ.sb.from("quotes").select("number,customer,created_at").order("created_at",{ascending:false}).limit(10);(q.data||[]).forEach(function(r){items.push({agent:"Quinn",color:"#ec4899",text:"quoted "+(r.customer||"")+" ("+(r.number||"")+")",t:r.created_at});});}catch(e){}
+  items.sort(function(a,b){return (new Date(b.t||0))-(new Date(a.t||0));});
+  s.items=items.slice(0,40);s.loaded=true;if(state.active==="activity")render();
+}
+function relTime(t){if(!t)return"";try{var d=(Date.now()-new Date(t))/60000;if(d<1)return"just now";if(d<60)return Math.round(d)+"m ago";if(d<1440)return Math.round(d/60)+"h ago";return Math.round(d/1440)+"d ago";}catch(e){return"";}}
+function mActivityFeed(){
+  var s=feedState();if(WZ.sb&&!s.loaded)feedLoad();var items=s.items||[];
+  var rows=!WZ.sb?'<div class="p-6 text-center text-sm text-slate-400">Connect the database to see agent activity.</div>':(!s.loaded?'<div class="p-6 text-center text-sm text-slate-400">Loading\u2026</div>':(!items.length?'<div class="p-6 text-center text-sm text-slate-400">No activity yet \u2014 it fills as the agents work.</div>':items.map(function(a){return '<div class="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white" style="background:'+a.color+'">'+a.agent.charAt(0)+'</div><div class="flex-1 text-sm text-slate-700"><b class="font-medium">'+a.agent+'</b> '+a.text+'</div><div class="text-[11px] text-slate-400">'+relTime(a.t)+'</div></div>';}).join("")));
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="activity" class="h-4 w-4"></i> Live activity from your AI team \u2014 what they\u2019ve been doing. Agents run on their own schedules; this is their log.</div>'+panel("Team activity",rows)+'</div>';
+}
+
 function render(){
   renderNav();
   const cur=NAV.flatMap(s=>s.items).find(n=>n.key===state.active);
   document.getElementById("pageTitle").textContent=cur.label;
   const c=document.getElementById("content");
   const map={
-    dispatch:mDispatch,problems:mProblemContainers,planner:mPlanner,optimizer:mOptimizer,pulllist:mPullList,appointments:mAppointments,yard:mYard,
+    dispatch:mDispatch,problems:mProblemContainers,demurragewatch:mDemurrageWatch,outlook:mDispatchOutlook,planner:mPlanner,optimizer:mOptimizer,pulllist:mPullList,appointments:mAppointments,yard:mYard,
     emailintake:mEmailIntake,
     streetturns:mStreetTurns,
     templates:mTemplates,
@@ -3148,7 +3227,7 @@ function render(){
     scorecards:mScorecards,
     arap:mARAP,accessorials:mAccessorials,invoicing:mInvoicing,autoinvoice:mAutoInvoice,perdiem:mPerdiem,
     vendorbills:mVendorBills,ezpass:mEzpass,
-    customers:mCustomers,ratecards:mRateCards,custservice:mCustomerHub,
+    customers:mCustomers,ratecards:mRateCards,custservice:mCustomerHub,onboarding:mOnboarding,
     quotes:mQuotes,
     notifications:mNotifications,
     ocean:mOcean,holds:mHolds,
@@ -3170,10 +3249,10 @@ function render(){
     /* v2 — Insights */
     tracking:mTracking,reports:mReports,execdash:mExecDash,laneforecast:mLaneForecast,anomaly:mAnomaly,
     /* v2 — AI */
-    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,employees:mEmployees,max:mMax,maxmem:function(){return memScreen("Max","max_memory");},theo:mTheo,theomem:function(){return memScreen("Theo","theo_memory");},quinn:mQuinn,quinnmem:function(){return memScreen("Quinn","quinn_memory");},sam:mSam,sammem:function(){return memScreen("Sam","sam_memory");},
+    demurrageai:mDemurrageAi,driveraiengine:mDriverAiEngine,nlreports:mNlReports,avamemory:mAvaMemory,approvals:mApprovals,employees:mEmployees,activity:mActivityFeed,max:mMax,maxmem:function(){return memScreen("Max","max_memory");},theo:mTheo,theomem:function(){return memScreen("Theo","theo_memory");},quinn:mQuinn,quinnmem:function(){return memScreen("Quinn","quinn_memory");},sam:mSam,sammem:function(){return memScreen("Sam","sam_memory");},
     /* v2 — Integrations */
     ratecon:mRatecon,boardsync:mBoardSync,slack:mSlack,sms:mSms,accountingsync:mAccountingSync,publicapi:mPublicApi,
-    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,chassisaudit:mChassisAudit,waitingaudit:mWaitingTimeAudit,disputes:mDisputes,creditmemos:mCreditMemos,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
+    books:mBooks,payments:mPayments,statements:mStatements,pennydesk:mPennyDesk,pennymemory:mPennyMemory,arbilling:mARBilling,arinvoices:mARInvoices,araging:mARAging,arcollections:mARCollections,arapply:mARApply,recovery:mRecoveryCenter,billingexc:mBillingExceptions,perdiemaudit:mPerDiemAudit,chassisaudit:mChassisAudit,waitingaudit:mWaitingTimeAudit,disputes:mDisputes,creditmemos:mCreditMemos,apdriverpay:mAPDriverPay,apsettlements:mAPSettlements,apded:mAPDeductions,aging:mAging,reconcile:mReconcile,pnl:mPnL,balance:mBalance,expenses:mBkExpenses,apbills:mBills,arbooks:mAR,bank:mBank,coa:mCOA,
     roles:mRoles,
     settings:mSettings,
   };
