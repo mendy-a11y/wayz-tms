@@ -2904,12 +2904,39 @@ function mAPSettlements(){
   const k=kpis([["Net payable",money(netTot)],["Drivers",String(byDriver.length)],["Deductions",money(byDriver.reduce(function(a,s){return a+s.ded;},0)),"text-red-600"]]);
   return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="wallet" class="h-4 w-4"></i> Weekly driver settlements \u2014 gross pay minus deductions.</div>${k}${panel("Driver settlements",tbl(["Driver","Moves","Gross","Deductions","Net",""],rows))}</div>`;
 }
+function dedCsvUpload(){
+  var fileEl=document.getElementById("ded_csv");var file=fileEl&&fileEl.files&&fileEl.files[0];
+  if(!file){toast("Choose a CSV file first");return;}
+  var reader=new FileReader();
+  reader.onload=async function(){
+    var text=String(reader.result||"");
+    var lines=text.split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
+    var toInsert=[],skipped=0;
+    lines.forEach(function(line){
+      var cols=line.split(",");
+      var driver=String(cols[0]||"").trim().replace(/^"|"$/g,"");
+      var amt=parseFloat(String(cols[1]||"").replace(/[^0-9.\-]/g,""));
+      var label=(String(cols[2]||"").trim().replace(/^"|"$/g,""))||"Deduction";
+      if(!driver||isNaN(amt)){skipped++;return;}
+      toInsert.push({driver:driver,label:label,amount:amt});
+    });
+    if(!toInsert.length){toast("No valid rows found \u2014 check the format");return;}
+    var s=apDedState();
+    if(WZ.sb){try{await WZ.sb.from("deductions").insert(toInsert);}catch(e){toast("DB error: "+(e.message||e));}s.loaded=false;await apDedLoad();}
+    else{s.list=(s.list||[]).concat(toInsert);render();}
+    toast(toInsert.length+" deduction"+(toInsert.length!==1?"s":"")+" imported"+(skipped?(", "+skipped+" skipped"):""));
+  };
+  reader.readAsText(file);
+}
+window.dedCsvUpload=dedCsvUpload;
+
 function mAPDeductions(){
   const deds=apDeds();
   const rows=deds.length?deds.map(function(d){return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-700">${d.driver}</td><td class="px-4 py-3 text-slate-700">${d.label}</td><td class="px-4 py-3 tabular text-slate-800">${money(d.amount)}</td><td class="px-4 py-3 text-right">${d.id?`<button onclick="delDeduction('${d.id}')" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="h-4 w-4"></i></button>`:""}</td></tr>`;}).join(""):'<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No deductions set.</td></tr>';
   const add=`<div class="wz-card"><div class="wz-card-head">Add deduction</div><div class="space-y-2 p-4"><select id="ded_driver" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">${DRIVERS.length?DRIVERS.map(function(d){return `<option>${d.name}</option>`;}).join(""):'<option>No drivers</option>'}</select><input id="ded_label" placeholder="e.g. Chassis rental, Escrow, Advance" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><input id="ded_amt" type="number" placeholder="$ per settlement" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"/><button onclick="addDeduction()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Add deduction</button></div></div>`;
+  const csv='<div class="wz-card"><div class="wz-card-head">Import from CSV</div><div class="space-y-2 p-4"><div class="rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500"><span class="font-medium text-slate-700">CSV format:</span> Column A = driver name, Column B = amount (optional Column C = label). No header row needed. Example:<div class="mt-1 font-mono text-slate-600">R. Alvarez,45,Chassis rental<br>M. Osei,50</div></div><input id="ded_csv" type="file" accept=".csv,text/csv" class="w-full text-xs"/><button onclick="dedCsvUpload()" class="wz-btn-brand w-full rounded-lg py-2 text-sm font-semibold">Upload CSV</button></div></div>';
   const k=kpis([["Deductions",String(deds.length)],["Total / cycle",money(deds.reduce(function(a,d){return a+(Number(d.amount)||0);},0)),"text-red-600"]]);
-  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="minus-circle" class="h-4 w-4"></i> Recurring driver deductions \u2014 applied on settlements.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Deductions",tbl(["Driver","Deduction","Amount",""],rows))}</div>${add}</div></div>`;
+  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="minus-circle" class="h-4 w-4"></i> Recurring driver deductions \u2014 applied on settlements.</div>${k}<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">${panel("Deductions",tbl(["Driver","Deduction","Amount",""],rows))}</div><div class="space-y-4">${add}${csv}</div></div></div>`;
 }
 
 /* ================= PROBLEM CONTAINERS ================= */
