@@ -3259,10 +3259,69 @@ window.qdPreview=qdPreview;
 function mQuinnDesk(){
   var s=quotesState();if(WZ.sb&&!s.loaded)quotesLoad();var list=s.list||[];
   var drafts=list.filter(function(q){return q.status==="draft";});
-  var rows=drafts.length?drafts.map(function(q){return '<tr class="cursor-pointer hover:bg-slate-50"><td class="px-4 py-3 font-medium text-sky-700" onclick="qdPreview(\''+q.id+'\')">'+(q.number||"")+'</td><td class="px-4 py-3 text-slate-700">'+(q.customer||"")+'</td><td class="px-4 py-3 text-xs text-slate-500">'+(q.lane||"")+'</td><td class="px-4 py-3 tabular text-slate-800">'+money(q.base)+'</td><td class="px-4 py-3 text-right"><button onclick="qApprove(\''+q.id+'\')" class="rounded-md bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white">Approve &amp; send</button> <button onclick="qReject(\''+q.id+'\')" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Reject</button></td></tr>';}).join(""):'<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">No quotes awaiting approval.</td></tr>';
-  var k=kpis([["Awaiting approval",String(drafts.length),drafts.length?"text-amber-600":"text-emerald-600"],["Agent","Quinn"],["Markup","\u00d71.47"]]);
+  var rows=drafts.length?drafts.map(function(q){return '<tr class="cursor-pointer hover:bg-slate-50"><td class="px-4 py-3 font-medium text-sky-700" onclick="qCalc(\''+q.id+'\')">'+(q.number||"")+'</td><td class="px-4 py-3 text-slate-700">'+(q.customer||"")+'</td><td class="px-4 py-3 text-xs text-slate-500">'+(q.lane||"")+'</td><td class="px-4 py-3 tabular text-slate-800">'+money(q.base)+'</td><td class="px-4 py-3 text-right"><button onclick="qCalc(\''+q.id+'\')" class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Price &amp; review</button> <button onclick="qReject(\''+q.id+'\')" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">Reject</button></td></tr>';}).join(""):'<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">No quotes awaiting approval.</td></tr>';
+  var k=kpis([["Awaiting approval",String(drafts.length),drafts.length?"text-amber-600":"text-emerald-600"],["Agent","Quinn"],["Price here","then approve"]]);
   return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Quinn drafts quotes from inbound rate requests (driver pay \u00d7 1.47 + your schedule) \u2014 review and approve before she sends.</div>'+k+panel("Quotes awaiting approval",'<table class="w-full text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-4 py-3">Quote</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Lane</th><th class="px-4 py-3">Linehaul</th><th class="px-4 py-3"></th></tr></thead><tbody class="divide-y divide-slate-100">'+rows+'</tbody></table>')+'</div>';
 }
+
+/* ================= QUINN DESK CALCULATOR ================= */
+function qcNum(id){return parseFloat((document.getElementById(id)||{}).value)||0;}
+function qCalcLive(){var lh=Math.round(qcNum("qc_driver")*(1+qcNum("qc_markup")/100));var el=document.getElementById("qc_linehaul");if(el)el.textContent=money(lh);}
+function qcSchedule(){
+  var driver=qcNum("qc_driver"),mk=qcNum("qc_markup"),lh=Math.round(driver*(1+mk/100));
+  var fsc=qcNum("qc_fsc"),chassis=qcNum("qc_chassis"),prepull=qcNum("qc_prepull"),det=qcNum("qc_det"),free=qcNum("qc_free")||2,yard=qcNum("qc_yard"),bob=qcNum("qc_bobtail");
+  var sched=[
+    {l:"Linehaul (all-in)",v:money(lh)},
+    {l:"FSC ("+fsc+"%)",v:money(Math.round(lh*fsc/100))},
+    {l:"Chassis",v:money(chassis)+" / day"},
+    {l:"Pre-pull",v:money(prepull)},
+    {l:"Detention \u2014 port",v:money(det)+" after "+free+" hrs free"},
+    {l:"Detention \u2014 customer",v:money(det)+" after "+free+" hrs free"},
+    {l:"Yard / storage",v:money(yard)+" / day"},
+    {l:"Bobtail",v:money(Math.round(lh*bob/100))+" ("+bob+"% of linehaul)"},
+    {l:"Overweight 40ft",v:"52k $125 / 58k $225 / 62k $300"},
+    {l:"Overweight 20ft",v:"44.6k $125 / 48.6k $225 / 53k $300"}
+  ];
+  return {lh:lh,driver:driver,mk:mk,sched:sched};
+}
+function qCalc(id){
+  var q=(quotesState().list||[]).find(function(x){return x.id===id;});if(!q)return;
+  var cust=q.customer||"";var r=function(k,d){var v=rateGet(k,cust);return (v===undefined||v===null)?d:v;};
+  var row=function(label,rid,val,suffix){return '<div class="flex items-center gap-2"><label class="w-36 text-xs text-slate-500">'+label+'</label><input id="'+rid+'" value="'+(val==null?"":val)+'" oninput="qCalcLive()" class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm outline-none focus:border-sky-400"/>'+(suffix?'<span class="w-28 text-[11px] text-slate-400">'+suffix+'</span>':'')+'</div>';};
+  wzModal(
+    '<div class="border-b border-slate-100 px-5 py-4"><div class="text-base font-semibold text-slate-900">Price quote '+(q.number||"")+'</div><div class="text-xs text-slate-500">'+(cust||"(no customer)")+' \u00b7 '+(q.lane||"")+(q.size?(" \u00b7 "+q.size):"")+'</div></div>'
+    +'<div class="max-h-[64vh] space-y-4 overflow-y-auto p-5">'
+    +(q.request?('<div class="rounded-lg bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-500"><span class="font-medium text-slate-600">Request:</span> '+String(q.request).replace(/</g,"&lt;").slice(0,500)+'</div>'):'')
+    +'<div class="space-y-2 rounded-xl border border-slate-200 p-4"><div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Linehaul = driver pay + markup</div>'
+      +row("Driver pay $","qc_driver",q.driver_pay,"from your sheet")
+      +row("Markup %","qc_markup",(q.markup!=null?q.markup:47),"e.g. 47")
+      +'<div class="flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white"><span>Linehaul (all-in)</span><span id="qc_linehaul">$0</span></div></div>'
+    +'<div class="space-y-2 rounded-xl border border-slate-200 p-4"><div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Accessorials \u2014 adjust as needed</div>'
+      +row("FSC %","qc_fsc",r("fsc_pct",7),"% of linehaul")
+      +row("Chassis / day","qc_chassis",r("chassis_day",40),"")
+      +row("Pre-pull","qc_prepull",r("prepull",135),"")
+      +row("Detention / hr","qc_det",r("detention_hr",85),"port & customer")
+      +row("Free hours","qc_free",r("free_hours",2),"before detention")
+      +row("Yard / day","qc_yard",r("yard_storage",35),"")
+      +row("Bobtail %","qc_bobtail",r("bobtail_pct",70),"% of linehaul")
+    +'<div class="text-[11px] text-slate-400">Overweight tiers are added to the quote automatically.</div></div>'
+    +'</div>'
+    +'<div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">Cancel</button><button onclick="qSaveDraft(\''+id+'\')" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Save draft</button><button onclick="qApproveSend(\''+id+'\')" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Approve &amp; send</button></div>'
+  );
+  qCalcLive();
+}
+async function qApproveSend(id){var d=qcSchedule();if(!d.driver){toast("Enter the driver pay first");return;}
+  var patch={base:d.lh,driver_pay:d.driver,markup:d.mk,schedule:d.sched,status:"approved"};
+  if(WZ.sb){try{var r=await WZ.sb.from("quotes").update(patch).eq("id",id);if(r&&r.error){toast("DB error: "+r.error.message);return;}}catch(e){toast("DB error: "+(e.message||e));return;}}
+  (quotesState().list||[]).forEach(function(q){if(q.id===id)Object.assign(q,patch);});
+  wzClose();toast("Approved \u2014 Quinn will email it");render();
+}
+async function qSaveDraft(id){var d=qcSchedule();var patch={base:d.lh,driver_pay:d.driver,markup:d.mk,schedule:d.sched};
+  if(WZ.sb){try{await WZ.sb.from("quotes").update(patch).eq("id",id);}catch(e){toast("DB error: "+(e.message||e));return;}}
+  (quotesState().list||[]).forEach(function(q){if(q.id===id)Object.assign(q,patch);});
+  wzClose();toast("Draft saved");render();
+}
+window.qCalc=qCalc;window.qCalcLive=qCalcLive;window.qApproveSend=qApproveSend;window.qSaveDraft=qSaveDraft;
 
 function render(){
   renderNav();
