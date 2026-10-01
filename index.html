@@ -3050,6 +3050,7 @@ function mEmployees(){
   var atrisk=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed"&&((typeof loadIssues==="function")?loadIssues(l).length:0);}).length;
   var active=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";}).length;
   var quotes=(state.quotes||[]).length;
+  var quoteReqs=(state.q&&state.q.list)?state.q.list.filter(function(x){return x.status==="draft"||!x.status;}).length:0;
   var alerts=DRIVERS.filter(function(d){return d.hos!=null&&d.hos<3;}).length;
   function card(name,role,color,tasks,links){return '<div class="wz-card p-5"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-white" style="background:'+color+'">'+name.charAt(0)+'</div><div><div class="text-sm font-semibold text-slate-900">'+name+'</div><div class="text-xs text-slate-500">'+role+'</div></div></div><div class="mt-4 space-y-2">'+tasks.map(function(t){return '<div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span class="text-slate-600">'+t[0]+'</span><span class="rounded-full px-2 py-0.5 text-xs font-medium '+(t[1]>0?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700')+'">'+t[1]+'</span></div>';}).join("")+'</div><div class="mt-4 flex flex-wrap gap-2">'+links.map(function(x){return '<button onclick="setActive(\''+x[1]+'\')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">'+x[0]+'</button>';}).join("")+'</div></div>';}
   return '<div class="p-6"><div class="mb-4 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="bot" class="h-4 w-4"></i> Your AI employees \u2014 what they\u2019re handling and what needs you.</div><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">'
@@ -3058,6 +3059,7 @@ function mEmployees(){
     +card("Max","Dispatch copilot","#6366f1",[["At-risk loads",atrisk]],[["Open Max","max"],["Memory","maxmem"]])
     +card("Theo","Track & trace","#f59e0b",[["Active shipments",active]],[["Open Theo","theo"],["Memory","theomem"]])
     +card("Sam","Safety & compliance","#0891b2",[["Compliance alerts",alerts]],[["Open Sam","sam"],["Memory","sammem"]])
+    +card("Quinn","Sales \u00b7 quoting","#ec4899",[["Requests to price",quoteReqs]],[["Quinn\u2019s Desk","quinndesk"]])
     +'</div></div>';
 }
 
@@ -3180,40 +3182,36 @@ function qcOvw(){var s=document.getElementById("qc_ovwsel"),i=document.getElemen
 window.qcOvw=qcOvw;
 function qCalcLive(){
   var base=Math.round(qcNum("qc_driver")*(1+qcNum("qc_markup")/100));qcSet("qc_base",money(base));
-  var fsc=Math.round(base*qcNum("qc_fsc")/100);qcSet("qc_fscamt",money(fsc));
-  var chDays=Math.max(0,qcNum("qc_chdays")-qcNum("qc_chfree")),chassis=chDays*qcNum("qc_chassis");qcSet("qc_chassisamt",money(chassis));
-  var prepull=qcNum("qc_prepull");
-  var detPort=qcNum("qc_detporthrs")*qcNum("qc_detportrate");qcSet("qc_detportamt",money(detPort));
-  var detCust=qcNum("qc_detcusthrs")*qcNum("qc_detcustrate");qcSet("qc_detcustamt",money(detCust));
-  var ovw=qcNum("qc_ovw");
+  qcSet("qc_fscamt",money(Math.round(base*qcNum("qc_fsc")/100)));
   var bob=qcVal("qc_bobtype")==="flat"?qcNum("qc_bobval"):Math.round(base*qcNum("qc_bobval")/100);qcSet("qc_bobamt",money(bob));
-  var reefer=qcNum("qc_reefer");
-  qcSet("qc_total",money(base+fsc+chassis+prepull+detPort+detCust+ovw+bob+reefer));
 }
 window.qCalcLive=qCalcLive;
+function qcChassisToggle(){var c=document.getElementById("qc_chfreechk"),w=document.getElementById("qc_chfreewrap");if(w)w.style.display=(c&&c.checked)?"inline-flex":"none";}
+window.qcChassisToggle=qcChassisToggle;
 function qcSchedule(){
   var driver=qcNum("qc_driver"),mk=qcNum("qc_markup"),base=Math.round(driver*(1+mk/100));
   var fscP=qcNum("qc_fsc"),fsc=Math.round(base*fscP/100);
-  var chRate=qcNum("qc_chassis"),chFree=qcNum("qc_chfree"),chDays=Math.max(0,qcNum("qc_chdays")-chFree),chassis=chDays*chRate;
+  var chRate=qcNum("qc_chassis"),chOn=!!(document.getElementById("qc_chfreechk")||{}).checked,chFree=qcNum("qc_chfree");
   var prepull=qcNum("qc_prepull");
-  var dpR=qcNum("qc_detportrate"),dpH=qcNum("qc_detporthrs"),detPort=dpR*dpH;
-  var dcR=qcNum("qc_detcustrate"),dcH=qcNum("qc_detcusthrs"),detCust=dcR*dcH;
-  var ovw=qcNum("qc_ovw");
+  var dpR=qcNum("qc_detportrate"),dpF=qcNum("qc_detportfree");
+  var dcR=qcNum("qc_detcustrate"),dcF=qcNum("qc_detcustfree");
+  var yard=qcNum("qc_yard");
   var bobType=qcVal("qc_bobtype"),bobVal=qcNum("qc_bobval"),bob=bobType==="flat"?bobVal:Math.round(base*bobVal/100);
-  var reefer=qcNum("qc_reefer");
+  var ovw=qcNum("qc_ovw"),reefer=qcNum("qc_reefer");
   var s=[{l:"Base price",v:money(base)}];
-  if(fsc)s.push({l:"FSC ("+fscP+"%)",v:money(fsc)});
-  if(chassis)s.push({l:"Chassis ("+chDays+" day"+(chDays!==1?"s":"")+" @ "+money(chRate)+(chFree?(", "+chFree+" free"):"")+")",v:money(chassis)});
-  if(prepull)s.push({l:"Pre-pull",v:money(prepull)});
-  if(detPort)s.push({l:"Detention \u2014 port ("+dpH+" hr @ "+money(dpR)+")",v:money(detPort)});
-  if(detCust)s.push({l:"Detention \u2014 customer ("+dcH+" hr @ "+money(dcR)+")",v:money(detCust)});
+  s.push({l:"FSC ("+fscP+"%)",v:money(fsc)});
+  s.push({l:"Chassis",v:money(chRate)+"/day"+(chOn&&chFree?(" ("+chFree+" free day"+(chFree!==1?"s":"")+")"):"")});
+  s.push({l:"Pre-pull",v:money(prepull)});
+  s.push({l:"Detention (port)",v:money(dpR)+"/hr after "+dpF+" hr"+(dpF!==1?"s":"")+" free"});
+  s.push({l:"Detention (customer)",v:money(dcR)+"/hr after "+dcF+" hr"+(dcF!==1?"s":"")+" free"});
+  s.push({l:"Yard storage",v:money(yard)+"/day"});
+  s.push({l:"Bobtail"+(bobType==="flat"?"":(" ("+bobVal+"% of base)")),v:money(bob)});
   if(ovw)s.push({l:"Overweight",v:money(ovw)});
-  if(bob)s.push({l:"Bobtail"+(bobType==="flat"?"":(" ("+bobVal+"% of base)")),v:money(bob)});
   if(reefer)s.push({l:"Reefer fee",v:money(reefer)});
-  var total=base+fsc+chassis+prepull+detPort+detCust+ovw+bob+reefer;
-  s.push({l:"TOTAL",v:money(total)});
-  return {base:base,driver:driver,mk:mk,total:total,sched:s};
+  return {base:base,driver:driver,mk:mk,sched:s};
 }
+function qcDriverLook(v){var r=(typeof driverPay==="function")?driverPay(v):null;var el=document.getElementById("qc_dpinfo");if(!el)return;if(!r){el.innerHTML="";return;}el.innerHTML='<span class="text-slate-600">'+r[0]+': delivery $'+r[1]+' + empty $'+r[2]+' = <b class="text-slate-800">driver pay $'+r[3]+'</b> ('+r[4]+' mi)</span> <button type="button" onclick="var d=document.getElementById(\'qc_driver\');if(d){d.value='+r[3]+';qCalcLive();}" class="ml-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">Use</button>';}
+window.qcDriverLook=qcDriverLook;
 function qCalc(id){
   var q=(quotesState().list||[]).find(function(x){return x.id===id;});if(!q)return;
   var cust=q.customer||"";var r=function(k,d){var v=rateGet(k,cust);return (v===undefined||v===null)?d:v;};
@@ -3227,19 +3225,22 @@ function qCalc(id){
     +(q.request?('<div class="rounded-lg bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-500"><span class="font-medium text-slate-600">Request:</span> '+String(q.request).replace(/</g,"&lt;").slice(0,600)+'</div>'):'')
     +'<div class="space-y-2 rounded-xl border border-slate-200 p-4">'+sec("Base price \u2014 driver pay + markup")
       +'<div class="grid grid-cols-2 gap-2"><div><label class="text-[11px] text-slate-500">Driver pay $</label><input id="qc_driver" value="'+(q.driver_pay||"")+'" oninput="qCalcLive()" class="w-full '+I+'"/></div><div><label class="text-[11px] text-slate-500">Markup %</label><input id="qc_markup" value="'+(q.markup!=null?q.markup:47)+'" oninput="qCalcLive()" class="w-full '+I+'"/></div></div>'
+      +'<input list="qc_dplist" oninput="qcDriverLook(this.value)" placeholder="Look up driver pay by delivery city\u2026" class="w-full '+I+'"/><datalist id="qc_dplist">'+DRIVER_PAY.map(function(r){return '<option value="'+r[0]+'"></option>';}).join("")+'</datalist><div id="qc_dpinfo" class="text-[11px] text-slate-500"></div>'
       +'<div class="flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white"><span>Base price</span><span id="qc_base">$0</span></div>'
-      +'<div class="text-[11px] text-slate-400">Look up the lane\u2019s driver pay in your sheet, type it here, set the % to add on top.</div></div>'
-    +'<div class="space-y-3 rounded-xl border border-slate-200 p-4">'+sec("Accessorials")
-      +'<div class="flex items-center gap-2"><label class="w-24 text-xs text-slate-600">FSC %</label><input id="qc_fsc" value="'+r("fsc_pct",7)+'" oninput="qCalcLive()" class="w-20 '+I+'"/><span class="text-[11px] text-slate-400">of base</span>'+amt("qc_fscamt")+'</div>'
-      +'<div class="flex flex-wrap items-center gap-2"><label class="w-24 text-xs text-slate-600">Chassis</label><input id="qc_chassis" value="'+r("chassis_day",40)+'" oninput="qCalcLive()" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/day</span><input id="qc_chfree" value="'+r("free_days",0)+'" oninput="qCalcLive()" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">free</span><input id="qc_chdays" value="0" oninput="qCalcLive()" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">days</span>'+amt("qc_chassisamt")+'</div>'
-      +'<div class="flex items-center gap-2"><label class="w-24 text-xs text-slate-600">Pre-pull</label><input id="qc_prepull" value="'+r("prepull",135)+'" oninput="qCalcLive()" class="w-24 '+I+'"/><span class="text-[11px] text-slate-400">flat</span></div>'
-      +'<div class="flex flex-wrap items-center gap-2"><label class="w-24 text-xs text-slate-600">Det. port</label><input id="qc_detportrate" value="'+r("detention_hr",85)+'" oninput="qCalcLive()" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/hr</span><input id="qc_detporthrs" value="0" oninput="qCalcLive()" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">hrs</span>'+amt("qc_detportamt")+'</div>'
-      +'<div class="flex flex-wrap items-center gap-2"><label class="w-24 text-xs text-slate-600">Det. cust.</label><input id="qc_detcustrate" value="'+r("detention_hr",85)+'" oninput="qCalcLive()" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/hr</span><input id="qc_detcusthrs" value="0" oninput="qCalcLive()" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">hrs</span>'+amt("qc_detcustamt")+'</div>'
-      +'<div class="flex flex-wrap items-center gap-2"><label class="w-24 text-xs text-slate-600">Overweight</label><select id="qc_ovwsel" onchange="qcOvw()" class="'+I+'">'+ovwOpts+'</select><input id="qc_ovw" value="0" oninput="qCalcLive()" class="w-16 '+I+'" title="amount $"/></div>'
-      +'<div class="flex flex-wrap items-center gap-2"><label class="w-24 text-xs text-slate-600">Bobtail</label><select id="qc_bobtype" onchange="qCalcLive()" class="'+I+'"><option value="pct">% of base</option><option value="flat">Flat $</option></select><input id="qc_bobval" value="'+r("bobtail_pct",70)+'" oninput="qCalcLive()" class="w-16 '+I+'"/>'+amt("qc_bobamt")+'</div>'
-      +'<div class="flex items-center gap-2"><label class="w-24 text-xs text-slate-600">Reefer fee</label><input id="qc_reefer" value="" oninput="qCalcLive()" class="w-24 '+I+'"/><span class="text-[11px] text-slate-400">optional</span></div>'
+      +'<div class="text-[11px] text-slate-400">Look up the lane\u2019s driver pay, type it here, set the % to add on top.</div></div>'
+    +'<div class="space-y-3 rounded-xl border border-slate-200 p-4">'+sec("Accessorials (standard \u2014 shown on every quote)")
+      +'<div class="flex items-center gap-2"><label class="w-28 text-xs text-slate-600">FSC %</label><input id="qc_fsc" value="'+r("fsc_pct",7)+'" oninput="qCalcLive()" class="w-20 '+I+'"/><span class="text-[11px] text-slate-400">of base</span>'+amt("qc_fscamt")+'</div>'
+      +'<div class="flex flex-wrap items-center gap-2"><label class="w-28 text-xs text-slate-600">Chassis</label><input id="qc_chassis" value="'+r("chassis_day",40)+'" oninput="qCalcLive()" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/day</span><label class="flex items-center gap-1 text-[11px] text-slate-500"><input type="checkbox" id="qc_chfreechk" onchange="qcChassisToggle()" class="rounded border-slate-300"/> free days?</label><span id="qc_chfreewrap" style="display:none" class="items-center gap-1"><input id="qc_chfree" value="'+r("free_days",2)+'" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">days free</span></span></div>'
+      +'<div class="flex items-center gap-2"><label class="w-28 text-xs text-slate-600">Pre-pull</label><input id="qc_prepull" value="'+r("prepull",135)+'" oninput="qCalcLive()" class="w-24 '+I+'"/><span class="text-[11px] text-slate-400">flat</span></div>'
+      +'<div class="flex flex-wrap items-center gap-2"><label class="w-28 text-xs text-slate-600">Detention port</label><input id="qc_detportrate" value="'+r("detention_hr",85)+'" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/hr after</span><input id="qc_detportfree" value="'+r("free_hours",2)+'" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">hrs free</span></div>'
+      +'<div class="flex flex-wrap items-center gap-2"><label class="w-28 text-xs text-slate-600">Detention cust.</label><input id="qc_detcustrate" value="'+r("detention_hr",85)+'" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/hr after</span><input id="qc_detcustfree" value="'+r("free_hours",2)+'" class="w-12 '+I+'"/><span class="text-[11px] text-slate-400">hrs free</span></div>'
+      +'<div class="flex items-center gap-2"><label class="w-28 text-xs text-slate-600">Yard storage</label><input id="qc_yard" value="'+r("yard_storage",35)+'" class="w-16 '+I+'"/><span class="text-[11px] text-slate-400">$/day</span></div>'
+      +'<div class="flex flex-wrap items-center gap-2"><label class="w-28 text-xs text-slate-600">Bobtail</label><select id="qc_bobtype" onchange="qCalcLive()" class="'+I+'"><option value="pct">% of base</option><option value="flat">Flat $</option></select><input id="qc_bobval" value="'+r("bobtail_pct",70)+'" oninput="qCalcLive()" class="w-16 '+I+'"/>'+amt("qc_bobamt")+'</div>'
     +'</div>'
-    +'<div class="flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-800"><span>Quote total</span><span id="qc_total">$0</span></div>'
+    +'<div class="space-y-3 rounded-xl border border-slate-200 p-4">'+sec("Optional")
+      +'<div class="flex flex-wrap items-center gap-2"><label class="w-28 text-xs text-slate-600">Overweight</label><select id="qc_ovwsel" onchange="qcOvw()" class="'+I+'">'+ovwOpts+'</select><input id="qc_ovw" value="0" class="w-16 '+I+'" title="amount $"/></div>'
+      +'<div class="flex items-center gap-2"><label class="w-28 text-xs text-slate-600">Reefer fee</label><input id="qc_reefer" value="" class="w-24 '+I+'"/><span class="text-[11px] text-slate-400">optional</span></div>'
+    +'</div>'
     +'</div>'
     +'<div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button onclick="wzClose()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">Cancel</button><button onclick="qSaveDraft(\''+id+'\')" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Save draft</button><button onclick="qApproveSend(\''+id+'\')" class="wz-btn-brand rounded-lg px-4 py-2 text-sm font-semibold">Approve &amp; send</button></div>'
   );
