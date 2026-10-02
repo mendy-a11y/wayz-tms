@@ -621,33 +621,69 @@ function toggleNav(sec){
 window.toggleNav=toggleNav;
 
 /* ---------------- MODULES ---------------- */
+function cityOf(l){var c=l.consignee||"";return c.split(",")[0]||c;}
+function isPortName(t){return ["apm","pnct","port liberty bayonne","gct ny","maher","red hook"].indexOf(String(t||"").toLowerCase())>=0;}
+function evCell(label,loc){return loc?('<div class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">'+label+'</div><div class="text-xs text-slate-700">'+loc+'</div>'):'<span class="text-slate-300">\u2014</span>';}
+function statusCell(l){
+  var p=[];
+  if(l.status==="delivered"||l.status==="completed")p.push('<span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">Delivered</span>');
+  else if(l.driver)p.push('<span class="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">Dispatched</span>');
+  else p.push('<span class="text-[11px] font-medium text-amber-600">Pending</span>');
+  (l.holds||[]).forEach(function(h){var rel=/released|clear/i.test(h);p.push('<span class="rounded px-1.5 py-0.5 text-[10px] font-medium '+(rel?"bg-emerald-50 text-emerald-700":"bg-amber-50 text-amber-700")+'">'+h+'</span>');});
+  return '<div class="flex flex-col items-start gap-1">'+p.join("")+'</div>';
+}
+function driverCell(l){
+  if(l.driver)return '<div><div class="text-xs font-medium text-slate-700">'+l.driver+'</div><div class="mt-1 flex gap-1"><button onclick="event.stopPropagation();driverConfirm(\''+l.id+'\')" class="flex h-5 w-5 items-center justify-center rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100"><i data-lucide="check" class="h-3 w-3"></i></button><button onclick="event.stopPropagation();driverReject(\''+l.id+'\')" class="flex h-5 w-5 items-center justify-center rounded bg-red-50 text-red-500 hover:bg-red-100"><i data-lucide="x" class="h-3 w-3"></i></button></div></div>';
+  return '<button onclick="event.stopPropagation();openAssign(\''+l.id+'\')" class="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-sky-400 hover:text-sky-600"><i data-lucide="user-plus" class="h-3.5 w-3.5"></i></button>';
+}
+function setDispTile(t){state.dispTile=t;state.dispTerminal=null;render();}
+function setDispTerm(t){state.dispTerminal=(state.dispTerminal===t?null:t);render();}
+function driverConfirm(id){toast("Dispatch confirmed");}
+function driverReject(id){var l=LOADS.find(function(x){return x.id===id;});if(l){l.driver=null;l.status="available";if(WZ.sb)wzUpsertLoad(l);}toast("Driver removed");render();}
+window.setDispTile=setDispTile;window.setDispTerm=setDispTerm;window.driverConfirm=driverConfirm;window.driverReject=driverReject;
 function mDispatch(){
-  var isActive=function(l){return l.status!=="delivered"&&l.status!=="completed";};
-  var board=LOADS.filter(function(l){return !l.driver&&["dispatched","enroute"].indexOf(l.status)<0&&isActive(l);});
-  var onHold=board.filter(function(l){return l.status==="hold"||(l.holds||[]).length>0;});
-  var lfdRisk=board.filter(function(l){return urgencyMeta(l).cls.indexOf("red")>=0;}).length;
-  var searching=!!state.search,rows=board;
-  if(searching){var q=state.search;rows=LOADS.filter(function(l){return [l.id,l.container,l.mbl,l.customer,l.ssl,l.terminal,(l.meta&&l.meta.ref)||""].join(" ").toLowerCase().includes(q);});}
-  var stat=function(n,label,cls){return '<div class="rounded-lg border border-slate-200 bg-white px-3.5 py-2"><span class="text-lg font-semibold tabular '+(cls||"text-slate-900")+'">'+n+'</span> <span class="ml-1 text-xs text-slate-500">'+label+'</span></div>';};
-  var head=searching
-    ? '<div class="mb-3 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800"><span>Showing all loads matching \u201c'+state.search+'\u201d (includes delivered)</span><button onclick="clearSearch()" class="rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-700">Clear</button></div>'
-    : '<div class="mb-4 flex flex-wrap items-center gap-2">'+stat(board.length,"Need pickup")+stat(lfdRisk,"LFD risk",lfdRisk?"text-red-600":"text-slate-900")+stat(onHold.length,"On hold",onHold.length?"text-amber-600":"text-slate-900")+'</div>';
-  var driverStrip='<div class="mb-3 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2"><span class="flex flex-shrink-0 items-center gap-1 px-1 text-[11px] font-medium text-slate-400">Drag onto a driver</span>'+DRIVERS.map(function(d){return '<div data-drop data-driver="'+d.name+'" class="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5"><div class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-[10px] font-semibold text-white">'+initials(d.name)+'</div><span class="text-xs font-medium text-slate-700">'+d.name+'</span></div>';}).join("")+'<div data-drop data-driver="" class="flex-shrink-0 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-500">Unassign</div></div>';
-  var route=function(l){return '<span class="text-slate-600">'+(l.terminal||"\u2014")+'</span> <span class="text-slate-300">\u2192</span> <span class="text-slate-600">'+((l.consignee||"").split(",")[0]||"\u2014")+'</span>';};
-  var bodyRows=rows.length?rows.map(function(l){var lfd=urgencyMeta(l);return '<tr onclick="openLoad(\''+l.id+'\')" class="cursor-pointer transition hover:bg-sky-50/40">'
-    +'<td class="px-2 py-3"><span class="plan-card inline-flex h-6 w-6 cursor-grab items-center justify-center text-slate-300 hover:text-slate-600 active:cursor-grabbing" data-load="'+l.id+'" data-ghost="'+l.id+'" onclick="event.stopPropagation()"><i data-lucide="grip-vertical" class="h-4 w-4"></i></span></td>'
-    +'<td class="px-3 py-3"><div class="font-medium text-sky-700">'+l.id+(isExport(l)?' <span class="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">EXP</span>':'')+'</div><div class="text-[10px] text-slate-400">'+(l.customer||"")+'</div></td>'
-    +'<td class="px-3 py-3"><span class="rounded px-1.5 py-0.5 text-xs tabular '+(lfd.cls.indexOf("red")>=0?"bg-red-50 ":"")+lfd.cls+'">'+lfd.txt+'</span></td>'
-    +'<td class="px-3 py-3">'+pill(l.status)+((l.holds||[]).length?('<div class="mt-1">'+holdBadges(l.holds)+'</div>'):"")+'</td>'
-    +'<td class="px-3 py-3 text-xs">'+route(l)+'</td>'
-    +'<td class="px-3 py-3"><div class="font-mono text-xs text-slate-700">'+(l.container||"")+'</div><div class="text-[10px] text-slate-400">'+(l.size||"")+(l.ssl?(" \u00b7 "+l.ssl):"")+'</div></td>'
-    +'<td class="px-3 py-3">'+(l.driver?('<span class="text-xs text-slate-600">'+l.driver+'</span>'):('<button onclick="event.stopPropagation();openAssign(\''+l.id+'\')" class="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sky-400 hover:text-sky-600">+ Assign</button>'))+'</td>'
-    +'</tr>';}).join(""):'<tr><td colspan="7" class="px-4 py-12 text-center text-sm text-slate-400">'+(searching?"No loads match your search.":"Nothing needs dispatching \u2014 all caught up.")+'</td></tr>';
+  var isAct=function(l){return l.status!=="delivered"&&l.status!=="completed";};
+  var needPickup=LOADS.filter(function(l){return isAct(l)&&!l.driver;});
+  var dispatched=LOADS.filter(function(l){return isAct(l)&&l.driver;});
+  var onHold=LOADS.filter(function(l){return isAct(l)&&(l.holds||[]).length;});
+  var atRisk=LOADS.filter(function(l){return isAct(l)&&urgencyMeta(l).cls.indexOf("red")>=0;});
+  var delivered=LOADS.filter(function(l){return l.status==="delivered"||l.status==="completed";});
+  var searching=!!state.search;
+  var tile=state.dispTile||"pickup";
+  var rows;
+  if(searching){var q=state.search;rows=LOADS.filter(function(l){return [l.id,l.container,l.mbl,l.customer,l.ssl,l.terminal].join(" ").toLowerCase().includes(q);});}
+  else rows=({pickup:needPickup,dispatched:dispatched,hold:onHold,risk:atRisk,delivered:delivered})[tile]||needPickup;
+  var byTerm={};rows.forEach(function(l){var t=l.terminal||"";if(t){byTerm[t]=(byTerm[t]||0)+1;}});
+  if(state.dispTerminal)rows=rows.filter(function(l){return (l.terminal||"")===state.dispTerminal;});
+  var riskN=function(a){return a.filter(function(l){return urgencyMeta(l).cls.indexOf("red")>=0;}).length;};
+  var apptN=needPickup.filter(function(l){return l.pickupAppt;}).length;
+  var tc=function(key,count,label,subs,cls){var on=(!searching&&tile===key);return '<button onclick="setDispTile(\''+key+'\')" class="rounded-xl border px-4 py-3 text-left transition '+(on?"border-sky-400 bg-sky-50/50 ring-1 ring-sky-200":"border-slate-200 bg-white hover:border-slate-300")+'"><div class="text-xl font-semibold '+(cls||"text-slate-900")+'">'+count+'</div><div class="text-xs text-slate-500">'+label+'</div>'+(subs?'<div class="mt-1 text-[11px] text-slate-400">'+subs+'</div>':'')+'</button>';};
+  var tiles='<div class="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">'
+    +tc("pickup",needPickup.length,"Need pickup","LFD/LRD "+riskN(needPickup)+" \u00b7 Appt "+apptN)
+    +tc("dispatched",dispatched.length,"Dispatched","out with a driver","text-sky-600")
+    +tc("hold",onHold.length,"On hold",onHold.length?"needs release":"clear",onHold.length?"text-amber-600":"text-slate-900")
+    +tc("risk",atRisk.length,"At risk","LFD/LRD red",atRisk.length?"text-red-600":"text-slate-900")
+    +tc("delivered",delivered.length,"Delivered","done","text-emerald-600")
+    +'</div>';
+  var terms=Object.keys(byTerm).sort();
+  var chips=terms.length?('<div class="mb-3 flex flex-wrap gap-1.5">'+terms.map(function(t){var on=state.dispTerminal===t;var port=isPortName(t);return '<button onclick="setDispTerm(\''+t.replace(/[\'\"]/g,"")+'\')" class="rounded-md px-2.5 py-1 text-xs font-medium '+(on?"bg-slate-800 text-white":(port?"bg-sky-50 text-sky-700 hover:bg-sky-100":"bg-slate-100 text-slate-600 hover:bg-slate-200"))+'">'+t+': '+byTerm[t]+'</button>';}).join("")+'</div>'):'';
+  var head=searching?('<div class="mb-3 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800"><span>Showing all loads matching \u201c'+state.search+'\u201d (includes delivered)</span><button onclick="clearSearch()" class="rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-700">Clear</button></div>'):'';
+  var body=rows.length?rows.map(function(l,i){var um=urgencyMeta(l);return '<tr onclick="openLoad(\''+l.id+'\')" class="cursor-pointer border-t border-slate-100 hover:bg-sky-50/40">'
+    +'<td class="px-3 py-3 text-xs text-slate-400">'+(i+1)+'</td>'
+    +'<td class="px-3 py-3 align-top"><div class="font-medium text-sky-700">'+l.id+(isExport(l)?' <span class="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">EXP</span>':'')+'</div><div class="text-[10px] text-slate-400">'+(l.customer||"")+'</div><div class="mt-0.5 text-[10px] '+(um.cls.indexOf("red")>=0?"text-red-600 font-semibold":"text-slate-400")+'">'+um.label+" "+um.txt+'</div></td>'
+    +'<td class="px-3 py-3 align-top">'+statusCell(l)+'</td>'
+    +'<td class="px-3 py-3 align-top">'+driverCell(l)+'</td>'
+    +'<td class="px-3 py-3 align-top">'+evCell("Pick up",l.terminal)+'</td>'
+    +'<td class="px-3 py-3 align-top">'+evCell("Deliver",cityOf(l))+'</td>'
+    +'<td class="px-3 py-3 align-top">'+evCell(isExport(l)?"Return":"Return",l.terminal)+'</td>'
+    +'<td class="px-3 py-3 align-top font-mono text-xs text-slate-600">'+(l.container||"")+'<div class="text-[10px] text-slate-400">'+(l.size||"")+(l.ssl?(" \u00b7 "+l.ssl):"")+'</div></td>'
+    +'<td class="px-3 py-3 align-top text-xs text-slate-500">'+((l.meta&&l.meta.ref)||l.ref||"\u2014")+'</td>'
+    +'<td class="px-3 py-3 align-top text-xs">'+(isExport(l)?'<span class="text-violet-600">Export</span>':'<span class="text-slate-500">Import</span>')+'</td>'
+    +'</tr>';}).join(""):'<tr><td colspan="10" class="px-4 py-12 text-center text-sm text-slate-400">'+(searching?"No loads match your search.":"Nothing here \u2014 pick another tile above.")+'</td></tr>';
   return '<div class="p-6">'
-    +'<div class="mb-3 flex items-center justify-between"><h2 class="text-base font-semibold text-slate-800">'+(searching?"Search results":"Dispatch board")+'</h2><button onclick="openCreateLoad()" class="wz-btn-brand flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"><i data-lucide="plus" class="h-4 w-4"></i> New load</button></div>'
-    +head
-    +(searching?"":driverStrip)
-    +'<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white" data-dragboard><table class="w-full min-w-[720px] text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-2 py-3"></th><th class="px-3 py-3">Load</th><th class="px-3 py-3">LFD / LRD</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Route</th><th class="px-3 py-3">Container</th><th class="px-3 py-3">Driver</th></tr></thead><tbody class="divide-y divide-slate-100">'+bodyRows+'</tbody></table></div>'
+    +'<div class="mb-3 flex items-center justify-between"><h2 class="text-base font-semibold text-slate-800">Dispatch board</h2><button onclick="openCreateLoad()" class="wz-btn-brand flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"><i data-lucide="plus" class="h-4 w-4"></i> New load</button></div>'
+    +tiles+chips+head
+    +'<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table class="w-full min-w-[980px] text-sm"><thead><tr class="bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-3 py-3">#</th><th class="px-3 py-3">Load</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Driver</th><th class="px-3 py-3">Pick up</th><th class="px-3 py-3">Deliver</th><th class="px-3 py-3">Return</th><th class="px-3 py-3">Container</th><th class="px-3 py-3">Ref</th><th class="px-3 py-3">Type</th></tr></thead><tbody>'+body+'</tbody></table></div>'
     +'</div>';
 }
 
@@ -3417,7 +3453,7 @@ function openCreateLoad(){wzModal(`
     ${wzInput("wzl_container","Container #","MSCU1234567")}
     ${wzInput("wzl_ssl","SSL","MSC")}
     <div class="col-span-2">${wzInput("wzl_mbl","MBL #","MEDU12345678")}</div>
-    ${wzSelect("wzl_terminal","Terminal",["APM Elizabeth","Maher Terminal","PNCT","GCT Bayonne","GCT NY"])}
+    ${wzSelect("wzl_terminal","Terminal (port)",["APM","PNCT","Port Liberty Bayonne","GCT NY","Maher","Red Hook"])}
     ${wzSelect("wzl_routing","Routing",["Live","Prepull-Live","Drop and Hook","Prepull drop","1 Way","Export"])}
     <div><label class="mb-1 block text-xs font-medium text-slate-500">Type</label><select id="wzl_type" onchange="wzTypeToggle()" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-400"><option value="IMP">Import (IMP)</option><option value="EXP">Export (EXP)</option></select></div>
     ${wzSelect("wzl_size","Size",["20'","40'","40HC","45'"])}
