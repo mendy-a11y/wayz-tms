@@ -89,12 +89,14 @@ body{color:var(--text)!important;font-family:var(--font-ui)!important;
 .wz-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-card);overflow:hidden}
 .wz-card-head{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;color:var(--text);font-family:var(--font-display);letter-spacing:-.01em}
 .wz-kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow-card);transition:transform .16s ease,box-shadow .16s ease}
-.wz-kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.wz-kpi:hover{box-shadow:var(--shadow-lg)}
 .wz-kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
 .wz-kpi-val{font-family:var(--font-display);font-size:26px;line-height:1.1;font-weight:600;color:var(--text);margin-top:5px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .wz-kpi-sub{font-size:11px;color:var(--faint);margin-top:3px}
 .wz-tbl{border-collapse:collapse}
 .wz-tbl thead th{background:var(--surface-2);text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:10px 16px;border-bottom:1px solid var(--border)}
+.wz-tbl tbody tr{transition:background .12s ease}
+.wz-tbl tbody tr:hover{background:var(--surface-2)}
 .wz-btn-brand{background:linear-gradient(135deg,var(--brand-2),var(--accent));color:#fff;box-shadow:0 6px 16px -6px rgba(47,127,224,.6)}
 .wz-btn-brand:hover{filter:brightness(1.06)}
 .wz-icon-btn{color:var(--muted)}
@@ -471,6 +473,8 @@ function loadLRD(l){var m=l&&l.meta&&l.meta.dates;return (m&&m.lrd)||(l&&l.lrd)|
 function loadERD(l){var m=l&&l.meta&&l.meta.dates;return (m&&m.erd)||(l&&l.erd)||"";}
 function loadBooking(l){return (l&&l.meta&&l.meta.booking)||(l&&l.booking)||"";}
 function urgencyMeta(l){if(isExport(l)){var u=lfdMeta(loadLRD(l)||"\u2014");u.label="LRD";return u;}var v=lfdMeta((l&&l.lfd)||"\u2014");v.label="LFD";return v;}
+function cleanTbl(cols,body,minw){return '<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table class="w-full '+(minw||"")+' text-sm"><thead><tr class="bg-slate-50 text-left text-xs font-medium text-slate-500">'+cols.map(function(c){return '<th class="px-3 py-3">'+c+'</th>';}).join("")+'</tr></thead><tbody>'+body+'</tbody></table></div>';}
+function loadCell(l){var um=urgencyMeta(l);return '<div class="font-medium text-sky-700">'+l.id+(isExport(l)?' <span class="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">EXP</span>':'')+'</div><div class="text-[10px] text-slate-400">'+(l.customer||"")+'</div><div class="mt-0.5 text-[10px] '+(um.cls.indexOf("red")>=0?"text-red-600 font-semibold":"text-slate-400")+'">'+um.label+" "+um.txt+'</div>';}
 function holdBadges(holds){
   if(!holds.length)return `<span class="text-xs text-emerald-600">Clear</span>`;
   return `<div class="flex flex-wrap gap-1">`+holds.map(h=>`<span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200">${h}</span>`).join("")+`</div>`;
@@ -703,6 +707,8 @@ function openLoad(id){
   l.docs=l.docs||[];l.charges=l.charges||{};l.ref=l.ref||"";l.chassis=l.chassis||"—";
   if(l.charges.total==null)l.charges.total=(l.charges.base||0)+(l.charges.fuel||0)+(l.charges.demurrage||0)+(l.charges.perdiem||0);
   const lfd=l.lfd?lfdMeta(l.lfd):{cls:"text-slate-400",txt:"—"};
+  const um=urgencyMeta(l);
+  const termStatus=isExport(l)?`<div class="grid grid-cols-3 gap-3 rounded-lg border border-slate-200 p-3"><div><div class="text-xs text-slate-500">ERD</div><div class="text-sm text-slate-800">${loadERD(l)||"—"}</div></div><div><div class="text-xs text-slate-500">LRD (cutoff)</div><div class="text-sm ${um.cls}">${um.txt}</div></div><div><div class="text-xs text-slate-500">Booking</div><div class="font-mono text-sm text-slate-800">${loadBooking(l)||"—"}</div></div></div><div class="mt-2 flex items-center gap-2"><span class="text-xs text-slate-500">Holds:</span>${holdBadges(l.holds)}</div>`:`<div class="flex items-center gap-3 rounded-lg border border-slate-200 p-3"><div class="flex-1"><div class="text-xs text-slate-500">Last free day</div><div class="text-sm ${um.cls}">${um.txt}</div></div><div class="h-8 w-px bg-slate-200"></div><div class="flex-1"><div class="text-xs text-slate-500">Holds</div><div class="mt-1">${holdBadges(l.holds)}</div></div></div>`;
   const LT=state.loadTab||"info";
   const fact=(lab,val,mono)=>`<div><div class="text-xs text-slate-500">${lab}</div><div class="text-sm text-slate-800 ${mono?'font-mono':''}">${val}</div></div>`;
   const row=(lab,val,warn)=>`<div class="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-0"><span class="${warn?'text-amber-700':'text-slate-600'}">${lab}</span><span class="tabular ${warn?'font-medium text-amber-700':'text-slate-800'}">${money(val)}</span></div>`;
@@ -714,7 +720,7 @@ function openLoad(id){
     <div class="flex items-start justify-between border-b border-slate-200 px-6 py-4">
       <div>
         <div class="flex items-center gap-3"><h2 class="text-lg font-semibold text-slate-900">${l.id}</h2>${pill(l.status)}${typeBadge(l.type)}</div>
-        <div class="mt-1 text-sm text-slate-500">${l.customer} · ${l.ref}</div>
+        <div class="mt-1 text-sm text-slate-500">${l.customer||""}${l.ref?(" · "+l.ref):""}</div>
       </div>
       <button onclick="closeLoad()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><i data-lucide="x" class="h-5 w-5"></i></button>
     </div>
@@ -724,11 +730,7 @@ function openLoad(id){
         <div class="grid grid-cols-2 gap-3">${fact("Container #",l.container,1)}${fact("Size / Type",l.size)}${fact("Steamship line",l.ssl)}${fact("MBL",l.mbl,1)}${fact("Chassis",l.chassis)}${fact("Terminal",l.terminal)}</div>
       </div>
       <div class="mb-6"><div class="mb-2 flex items-center gap-2"><h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Terminal status</h3><span class="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200"><i data-lucide="zap" class="h-3 w-3"></i> auto-scraped</span></div>
-        <div class="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-          <div class="flex-1"><div class="text-xs text-slate-500">Last Free Day</div><div class="text-sm ${lfd.cls}">${lfd.txt}</div></div>
-          <div class="h-8 w-px bg-slate-200"></div>
-          <div class="flex-1"><div class="text-xs text-slate-500">Holds</div><div class="mt-1">${holdBadges(l.holds)}</div></div>
-        </div>
+        ${termStatus}
       </div>
       ${marginBar(l)}
       ${l.driver?`<div class="mb-4 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800"><i data-lucide="calendar-clock" class="h-4 w-4"></i> Dispatched to ${l.driver}${(l.meta&&l.meta.dispatchDate)?(" — "+fmtDay(l.meta.dispatchDate)):""}</div>`:""}
@@ -757,12 +759,10 @@ function openLoad(id){
       <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Billing summary</h3>
         <div class="rounded-lg border border-slate-200">${row("Line haul",l.charges.base)}${row("Fuel surcharge",l.charges.fuel)}${l.charges.demurrage>0?row("Demurrage",l.charges.demurrage,1):""}${l.charges.perdiem>0?row("Per diem",l.charges.perdiem,1):""}
           <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2.5"><span class="text-sm font-semibold text-slate-900">Total</span><span class="text-sm font-semibold tabular text-slate-900">${money(l.charges.total)}</span></div></div>
-        <div class="mt-1 text-[11px] text-slate-400">Full drayage accessorial lingo (chassis split, pre-pull, yard storage, DblMove, etc.) to be added.</div>
       </div>
 `:""}
       ${LT==="docs"?`      <div class="mb-6"><h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Documents</h3><div class="mb-2 flex gap-2"><select id="dl_kind" class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs"><option>POD</option><option>TIR In</option><option>TIR Out</option><option>Delivery Order</option><option>BOL</option><option>Document</option></select><input id="dl_file" type="file" class="flex-1 text-xs"/><button onclick="docUpload(&#39;${l.id}&#39;)" class="wz-btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold">Upload</button></div>
         <div class="space-y-2">${l.docs.length===0?'<div class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">No documents attached yet.</div>':l.docs.map(d=>`<a href="${d.url||'#'}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 hover:border-sky-300 hover:bg-sky-50/40"><div class="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-slate-500"><i data-lucide="file-text" class="h-4 w-4"></i></div><div class="flex-1"><div class="text-sm font-medium text-slate-800">${d.type}</div><div class="truncate text-xs text-slate-400">${d.name}</div></div><i data-lucide="download" class="h-4 w-4 text-slate-400"></i></a>`).join("")}</div>
-        <div class="mt-3 flex flex-wrap gap-2">${DOC_TYPES.map(t=>`<button onclick="toast(&#39;${t} attach requested&#39;)" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-600"><i data-lucide="paperclip" class="h-3.5 w-3.5"></i> ${t}</button>`).join("")}</div>
       </div>
 `:""}
     </div>
@@ -2945,10 +2945,15 @@ function loadIssues(l){
   return out;
 }
 function mProblemContainers(){
-  const probs=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";}).map(function(l){return {l:l,issues:loadIssues(l)};}).filter(function(x){return x.issues.length;});
-  const rows=probs.length?probs.map(function(p){var l=p.l;return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 text-slate-700">${l.customer||""}</td><td class="px-4 py-3 text-slate-500">${l.terminal||""}</td><td class="px-4 py-3"><div class="flex flex-wrap gap-1">${p.issues.map(function(i){var red=/overdue|Holds/.test(i);return '<span class="rounded-full px-2 py-0.5 text-[10px] font-medium '+(red?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700')+'">'+i+'</span>';}).join("")}</div></td></tr>`;}).join(""):'<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">No problem containers \u2014 all clear.</td></tr>';
-  const k=kpis([["Problem containers",String(probs.length),probs.length?"text-red-600":"text-emerald-600"],["Holds",String(probs.filter(function(p){return p.issues.some(function(i){return /Holds/.test(i);});}).length)],["LFD risk",String(probs.filter(function(p){return p.issues.some(function(i){return /LFD/.test(i);});}).length),"text-amber-600"]]);
-  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="triangle-alert" class="h-4 w-4"></i> Containers that need attention \u2014 holds, LFD risk, missing appointments, unassigned.</div>${k}${panel("Problem containers",tbl(["Load","Container","Customer","Terminal","Issues"],rows))}</div>`;
+  var probs=LOADS.filter(function(l){return l.status!=="delivered"&&l.status!=="completed";}).map(function(l){return {l:l,issues:loadIssues(l)};}).filter(function(x){return x.issues.length;});
+  var body=probs.length?probs.map(function(p){var l=p.l;return '<tr onclick="openLoad(\''+l.id+'\')" class="cursor-pointer border-t border-slate-100 hover:bg-sky-50/40">'
+    +'<td class="px-3 py-3 align-top">'+loadCell(l)+'</td>'
+    +'<td class="px-3 py-3 align-top font-mono text-xs text-slate-600">'+(l.container||"")+'</td>'
+    +'<td class="px-3 py-3 align-top text-xs text-slate-600">'+(l.terminal||"\u2014")+'</td>'
+    +'<td class="px-3 py-3 align-top"><div class="flex flex-wrap gap-1">'+p.issues.map(function(i){var red=/overdue|passed|Holds/.test(i);return '<span class="rounded px-1.5 py-0.5 text-[10px] font-medium '+(red?"bg-red-50 text-red-700":"bg-amber-50 text-amber-700")+'">'+i+'</span>';}).join("")+'</div></td>'
+    +'</tr>';}).join(""):'<tr><td colspan="4" class="px-4 py-12 text-center text-sm text-slate-400">No problem containers \u2014 all clear.</td></tr>';
+  var k=kpis([["Problem containers",String(probs.length),probs.length?"text-red-600":"text-emerald-600"],["Holds",String(probs.filter(function(p){return p.issues.some(function(i){return /Holds/.test(i);});}).length)],["LFD/LRD risk",String(probs.filter(function(p){return p.issues.some(function(i){return /LFD|LRD/.test(i);});}).length),"text-amber-600"]]);
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="triangle-alert" class="h-4 w-4"></i> Containers that need attention \u2014 holds, LFD/LRD risk, missing appointments, unassigned.</div>'+k+cleanTbl(["Load","Container","Terminal","Issues"],body,"min-w-[720px]")+'</div>';
 }
 
 /* ================= TRACKING + REPORTS ================= */
@@ -3128,12 +3133,19 @@ function mDemurrageWatch(){
     return {l:l,days:days,over:over,rate:rate,accrued:over*rate};
   });
   items.sort(function(a,b){ if(a.accrued!==b.accrued) return b.accrued-a.accrued; return (a.days==null?999:a.days)-(b.days==null?999:b.days); });
-  var rows=items.length?items.map(function(p){var l=p.l;var badge=p.over?('<span class="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">'+p.over+'d overdue</span>'):(p.days!=null&&p.days<=2?('<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">'+p.days+'d left</span>'):('<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">'+(p.days==null?"\u2014":p.days+"d")+'</span>'));return `<tr class="cursor-pointer hover:bg-slate-50" onclick="openLoad('${l.id}')"><td class="px-4 py-3 font-medium text-sky-700">${l.id}</td><td class="px-4 py-3 font-mono text-xs text-slate-500">${l.container||""}</td><td class="px-4 py-3 text-slate-600">${l.terminal||""}</td><td class="px-4 py-3 text-slate-700">${l.customer||""}</td><td class="px-4 py-3 text-slate-500">${l.lfd}</td><td class="px-4 py-3">${badge}</td><td class="px-4 py-3 tabular ${p.accrued?'font-semibold text-red-600':'text-slate-400'}">${p.accrued?money(p.accrued):'\u2014'}</td></tr>`;}).join(""):'<tr><td colspan="7" class="px-4 py-10 text-center text-sm text-slate-400">No containers at demurrage risk \u2014 all clear.</td></tr>';
+  var body=items.length?items.map(function(p){var l=p.l;var badge=p.over?('<span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700">'+p.over+'d overdue</span>'):(p.days!=null&&p.days<=2?('<span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">'+p.days+'d left</span>'):('<span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">'+(p.days==null?"\u2014":p.days+"d")+'</span>'));return '<tr onclick="openLoad(\''+l.id+'\')" class="cursor-pointer border-t border-slate-100 hover:bg-sky-50/40">'
+    +'<td class="px-3 py-3 align-top"><div class="font-medium text-sky-700">'+l.id+'</div><div class="text-[10px] text-slate-400">'+(l.customer||"")+'</div></td>'
+    +'<td class="px-3 py-3 align-top font-mono text-xs text-slate-600">'+(l.container||"")+'</td>'
+    +'<td class="px-3 py-3 align-top text-xs text-slate-600">'+(l.terminal||"")+'</td>'
+    +'<td class="px-3 py-3 align-top text-xs text-slate-500">'+l.lfd+'</td>'
+    +'<td class="px-3 py-3 align-top">'+badge+'</td>'
+    +'<td class="px-3 py-3 align-top tabular '+(p.accrued?"font-semibold text-red-600":"text-slate-400")+'">'+(p.accrued?money(p.accrued):"\u2014")+'</td>'
+    +'</tr>';}).join(""):'<tr><td colspan="6" class="px-4 py-12 text-center text-sm text-slate-400">No containers at demurrage risk \u2014 all clear.</td></tr>';
   var totalAccrued=items.reduce(function(a,p){return a+p.accrued;},0);
   var overdue=items.filter(function(p){return p.over>0;}).length;
   var imminent=items.filter(function(p){return p.over===0&&p.days!=null&&p.days<=2;}).length;
   var k=kpis([["Accruing now",money(totalAccrued),totalAccrued?"text-red-600":"text-emerald-600"],["Overdue containers",String(overdue),overdue?"text-red-600":"text-slate-900"],["LFD within 2 days",String(imminent),imminent?"text-amber-600":"text-slate-900"]]);
-  return `<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="alarm-clock" class="h-4 w-4"></i> Containers still at the terminal, ranked by demurrage at risk \u2014 pull the top of this list first.</div>${k}${panel("Demurrage watch",tbl(["Load","Container","Terminal","Customer","LFD","Countdown","Accruing"],rows))}</div>`;
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="alarm-clock" class="h-4 w-4"></i> Containers still at the terminal, ranked by demurrage at risk \u2014 pull the top of this list first.</div>'+k+cleanTbl(["Load","Container","Terminal","LFD","Countdown","Accruing"],body,"min-w-[720px]")+'</div>';
 }
 
 /* ================= RECOVERY CENTER (#2) ================= */
@@ -3156,7 +3168,7 @@ function mDispatchOutlook(){
     days.push({key:key,assigned:assigned});
   }
   var unassigned=LOADS.filter(function(l){return !l.driver&&l.status==="available";}).length;
-  var rows=days.map(function(x){return '<button onclick="state.planDate=\''+x.key+'\';setActive(\'planner\')" class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left hover:border-sky-300"><div><div class="text-sm font-semibold text-slate-800">'+fmtDay(x.key)+'</div><div class="text-[11px] text-slate-400">'+x.assigned+' scheduled</div></div><i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i></button>';}).join("");
+  var rows=days.map(function(x){return '<button onclick="state.planDate=\''+x.key+'\';setActive(\'planner\')" class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-sky-300"><div><div class="text-sm font-semibold text-slate-800">'+fmtDay(x.key)+'</div><div class="mt-0.5 text-[11px] text-slate-400">'+x.assigned+' scheduled</div></div><div class="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><i data-lucide="chevron-right" class="h-4 w-4"></i></div></button>';}).join("");
   var k=kpis([["Unassigned",String(unassigned),unassigned?"text-amber-600":"text-emerald-600"],["Planning window","7 days"],["Copilot","Max"]]);
   return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="calendar-days" class="h-4 w-4"></i> Plan the week \u2014 assign loads to days now so drivers open a full schedule. Tap a day to plan it.</div>'+k+'<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">'+rows+'</div></div>';
 }
@@ -3195,21 +3207,23 @@ function mActivityFeed(){
 
 /* ================= DISPATCHED LOADS ================= */
 function mDispatchedLoads(){
-  var isActive=function(l){return l.status!=="delivered"&&l.status!=="completed";};
-  var rows=LOADS.filter(function(l){return l.driver&&isActive(l);});
+  var isAct=function(l){return l.status!=="delivered"&&l.status!=="completed";};
+  var rows=LOADS.filter(function(l){return l.driver&&isAct(l);});
   if(state.search){var q=state.search;rows=rows.filter(function(l){return [l.id,l.container,l.customer,l.driver,l.terminal].join(" ").toLowerCase().includes(q);});}
   var drv={};rows.forEach(function(l){drv[l.driver]=1;});
-  var k=kpis([["Dispatched",String(rows.length)],["Drivers out",String(Object.keys(drv).length)]]);
-  var route=function(l){return (l.terminal||"\u2014")+" \u2192 "+((l.consignee||"").split(",")[0]||"\u2014");};
-  var body=rows.length?rows.map(function(l){return '<tr onclick="openLoad(\''+l.id+'\')" class="cursor-pointer hover:bg-sky-50/40">'
-    +'<td class="px-3 py-3"><div class="font-medium text-sky-700">'+l.id+(isExport(l)?' <span class="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">EXP</span>':'')+'</div><div class="text-[10px] text-slate-400">'+(l.customer||"")+'</div></td>'
-    +'<td class="px-3 py-3 text-sm text-slate-700">'+l.driver+((l.meta&&l.meta.dispatchDate)?('<div class="text-[10px] font-medium text-sky-600">'+fmtDay(l.meta.dispatchDate)+'</div>'):"")+'</td>'
-    +'<td class="px-3 py-3 text-xs text-slate-600">'+route(l)+'</td>'
-    +'<td class="px-3 py-3">'+pill(l.status)+'</td>'
-    +'<td class="px-3 py-3 font-mono text-xs text-slate-600">'+(l.container||"")+'</td>'
-    +'<td class="px-3 py-3 text-right"><button onclick="event.stopPropagation();markDelivered(\''+l.id+'\')" class="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">Mark delivered</button></td>'
-    +'</tr>';}).join(""):'<tr><td colspan="6" class="px-4 py-12 text-center text-sm text-slate-400">No dispatched loads right now.</td></tr>';
-  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="route" class="h-4 w-4"></i> Loads out with a driver. When one is marked delivered it leaves here \u2014 find it later by search or in AR.</div>'+k+panel("Dispatched loads",'<table class="w-full text-sm"><thead><tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-3 py-3">Load</th><th class="px-3 py-3">Driver</th><th class="px-3 py-3">Route</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Container</th><th class="px-3 py-3"></th></tr></thead><tbody class="divide-y divide-slate-100">'+body+'</tbody></table>')+'</div>';
+  var k=kpis([["Dispatched",String(rows.length),"text-sky-600"],["Drivers out",String(Object.keys(drv).length)]]);
+  var body=rows.length?rows.map(function(l,i){return '<tr onclick="openLoad(\''+l.id+'\')" class="cursor-pointer border-t border-slate-100 hover:bg-sky-50/40">'
+    +'<td class="px-3 py-3 text-xs text-slate-400">'+(i+1)+'</td>'
+    +'<td class="px-3 py-3 align-top"><div class="font-medium text-sky-700">'+l.id+(isExport(l)?' <span class="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">EXP</span>':'')+'</div><div class="text-[10px] text-slate-400">'+(l.customer||"")+'</div></td>'
+    +'<td class="px-3 py-3 align-top text-xs text-slate-700">'+l.driver+((l.meta&&l.meta.dispatchDate)?('<div class="text-[10px] font-medium text-sky-600">'+fmtDay(l.meta.dispatchDate)+'</div>'):"")+'</td>'
+    +'<td class="px-3 py-3 align-top">'+statusCell(l)+'</td>'
+    +'<td class="px-3 py-3 align-top">'+evCell("Pick up",l.terminal)+'</td>'
+    +'<td class="px-3 py-3 align-top">'+evCell("Deliver",cityOf(l))+'</td>'
+    +'<td class="px-3 py-3 align-top">'+evCell("Return",l.terminal)+'</td>'
+    +'<td class="px-3 py-3 align-top font-mono text-xs text-slate-600">'+(l.container||"")+'</td>'
+    +'<td class="px-3 py-3 align-top text-right"><button onclick="event.stopPropagation();markDelivered(\''+l.id+'\')" class="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">Delivered</button></td>'
+    +'</tr>';}).join(""):'<tr><td colspan="9" class="px-4 py-12 text-center text-sm text-slate-400">No dispatched loads right now.</td></tr>';
+  return '<div class="p-6"><div class="mb-3 flex items-center gap-2 text-sm text-slate-500"><i data-lucide="route" class="h-4 w-4"></i> Loads out with a driver \u2014 marked delivered, they leave here (find later by search or in AR).</div>'+k+'<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table class="w-full min-w-[920px] text-sm"><thead><tr class="bg-slate-50 text-left text-xs font-medium text-slate-500"><th class="px-3 py-3">#</th><th class="px-3 py-3">Load</th><th class="px-3 py-3">Driver</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Pick up</th><th class="px-3 py-3">Deliver</th><th class="px-3 py-3">Return</th><th class="px-3 py-3">Container</th><th class="px-3 py-3"></th></tr></thead><tbody>'+body+'</tbody></table></div></div>';
 }
 
 /* ================= QUOTE DESK (Quinn) ================= */
